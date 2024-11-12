@@ -399,7 +399,7 @@ signalHandler()
 			exit
 			;;
 		*)
-			log "Signal: '${signal}' received in function: '$FUNCNAME' but dont know what to do..."
+			log "Signal: '${signal}' received in function: '${FUNCNAME[0]}' but dont know what to do..."
 			;;
 	esac
 }
@@ -696,7 +696,7 @@ do
             ERR_MESG[${#ERR_MESG[*]}]="${MP} did not respond in $TIME_TILL_STALE sec. Seems to be stale."
         else
 			## if it not stales, check if it is a directory
-			ISRW=0
+			ISRW="0"
             if [ ! -d "${MP}" ]
             then
                 log "CRIT: ${MP} doesn't exist on filesystem"
@@ -704,22 +704,22 @@ do
                 ## if wanted, check if it is writable
 			elif [ ${WRITETEST} -eq 1 ]
 			then
-                ISRW=1
+                ISRW="1"
 				## in auto mode first check if it's readonly
-			elif [ ${WRITETEST} -eq 1 ] && [ ${AUTO} -eq 1 ]
+			elif [ "${WRITETEST}" -eq 1 ] && [ "${AUTO}" -eq 1 ]
 			then
-				ISRW=1
+				ISRW="1"
 				for OPT in $(${GREP} -w ${MP} ${FSTAB} | awk '{print $4}'| sed -e 's/,/ /g')
 				do
-					if [ "$OPT" == 'ro' ]
+					if [ "$OPT" == "ro" ]
 					then
-						ISRW=0
+						ISRW="0"
                         log "CRIT: ${TOUCHFILE} is not mounted as writable."
                         ERR_MESG[${#ERR_MESG[*]}]="Could not write in ${MP} filesystem was mounted RO."
 					fi
 				done
 			fi
-			if [ ${ISRW} -eq 1 ]
+			if [ "${ISRW}" -eq 1 ]
 			then
 				TOUCHFILE="${MP}/.mount_test_from_$(hostname)_$(date +%Y-%m-%d--%H-%M-%S).$RANDOM.$$"
 				timeout --signal=TERM --kill-after=1 "${TIME_TILL_STALE}" touch "${TOUCHFILE}" &>/dev/null
@@ -765,45 +765,45 @@ do
             ERR_MESG[${#ERR_MESG[*]}]="Bad FS type for ${MP}. Got '${rfstype}' while '${efstype}' was expected"
             continue
         fi
+done
+
+if [ ${#ERR_MESG[*]} -ne 0 ]
+then
+    echo -n "CRITICAL: "
+    for element in "${ERR_MESG[@]}"
+    do
+        echo -n "${element} ; "
+    done
+    echo
+    exit "${STATE_CRITICAL}"
+else
+	MPS="$(trim ${MPS[*]})"
+	MPS="${MPS// /, }"
+
+	if [ "$crit_cnt" -gt 0 ]
+	then
+		echo "CRIT: All mounts (${MPS[*]}) were found, but critical threshold exceeded."
+		STATE="$STATE_CRITICAL"
+	elif [ "$warn_cnt" -gt 0 ]
+	then
+		echo "WARN: All mounts (${MPS[*]}) were found, but warning threshold exceeded."
+		STATE="$STATE_WARNING"
+	else
+		if [ -n "$WARN" ] && [ -n "$CRIT" ]
+		then
+			echo "OK: All mounts (${MPS[*]}) were found, no thresholds exceeded."
+			STATE="$STATE_OK"
+		else
+			echo "OK: All mounts (${MPS[*]}) were found, no thresholds defined."
+			STATE="$STATE_OK"
+		fi
+	fi
+
+	for item in "${outvar[@]}"
+	do
+		echo "${item}"
 	done
 
-	if [ ${#ERR_MESG[*]} -ne 0 ]
-	then
-        echo -n "CRITICAL: "
-        for element in "${ERR_MESG[@]}"
-        do
-            echo -n "${element} ; "
-        done
-        echo
-        exit "${STATE_CRITICAL}"
-	else
-		MPS="$(trim ${MPS[*]})"
-		MPS="${MPS// /, }"
-
-		if [ "$crit_cnt" -gt 0 ]
-		then
-			echo "CRIT: All mounts (${MPS[*]}) were found, but critical threshold exceeded."
-			STATE="$STATE_CRITICAL"
-		elif [ "$warn_cnt" -gt 0 ]
-		then
-			echo "WARN: All mounts (${MPS[*]}) were found, but warning threshold exceeded."
-			STATE="$STATE_WARNING"
-		else
-			if [ -n "$WARN" ] && [ -n "$CRIT" ]
-			then
-				echo "OK: All mounts (${MPS[*]}) were found, no thresholds exceeded."
-				STATE="$STATE_OK"
-			else
-				echo "OK: All mounts (${MPS[*]}) were found, no thresholds defined."
-				STATE="$STATE_OK"
-			fi
-		fi
-
-		for item in "${outvar[@]}"
-		do
-			echo "${item}"
-		done
-
-		echo "| ${perfdata[*]}"
-		exit "${STATE}"
-	fi
+	echo "| ${perfdata[*]}"
+	exit "${STATE}"
+fi
