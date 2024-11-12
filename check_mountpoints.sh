@@ -116,7 +116,7 @@ trap 'sig_handler EXIT' EXIT
 # --------------------------------------------------------------------
 # configuration
 # --------------------------------------------------------------------
-PROGNAME="$(basename $0)"
+PROGNAME="$(basename "$0")"
 PROGVERSION="3.0.0"
 ERR_MESG=()
 LOGGER="$(which logger) -i -p kern.warn -t"
@@ -305,7 +305,7 @@ check_options()
 
 trim()
 {
-    local string=$@
+    local string="${1}"
     string="${string#"${string%%[![:space:]]*}"}"
     string="${string%"${string##*[![:space:]]}"}"
     echo -n "$string"
@@ -326,7 +326,8 @@ add_perfdata()
 	local MP="${1}"
 	local warnstrip=
 	local critstrip=
-	local mpusage="$(df -h -P ${MP} | tail -n1 | awk '{print $4":"$5}')"
+	local mpusage=
+	mpusage="$(df -h -P ${MP} | tail -n1 | awk '{print $4":"$5}')"
 	local mpavail="${mpusage%%:*}"
 	local mpused="${mpusage##*:}"
 	local mpusedstrip="${mpused/\%/}"
