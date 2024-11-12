@@ -107,101 +107,16 @@
 trap 'signalHandler SIGTERM' SIGTERM
 trap 'signalHandler SIGINT' SIGINT
 trap 'signalHandler SIGHUP' SIGHUP
-trap 'signalHandler SIGABRT' SIGABRT
-trap 'signalHandler SIGQUIT' SIGQUIT
 trap 'signalHandler ERR "${LINENO}" "${BASH_COMMAND}"' ERR
 trap 'signalHandler EXIT' EXIT
 
 
-# --------------------------------------------------------------------
-# configuration
-# --------------------------------------------------------------------
-PROGNAME="$(basename "$0")"
-PROGVERSION="3.0.0"
-ERR_MESG=()
-LOGGER="$(which logger) -i -p kern.warn -t"
-
-AUTO="0"
-AUTOIGNORE="0"
-IGNOREFSTAB="0"
-WRITETEST="0"
-NOAUTOCOND="1"
-NOAUTOIGNORE="0"
-DFARGS=""
-EXCLUDE="none"
-
-export PATH="/bin:/usr/local/bin:/sbin:/usr/bin:/usr/sbin:/usr/sfw/bin"
-LIBEXEC="/opt/nagios/libexec /usr/lib64/nagios/plugins /usr/lib/nagios/plugins /usr/lib/monitoring-plugins /usr/local/nagios/libexec /usr/local/icinga/libexec /usr/local/libexec /opt/csw/libexec/nagios-plugins /opt/plugins /usr/local/libexec/nagios/ /usr/local/ncpa/plugins"
-for i in ${LIBEXEC}
-do
-	if [ -r "${i}/utils.sh" ]
-	then
-		source "${i}/utils.sh"
-	fi
-done
-
-if [ -z "$STATE_OK" ]
-then
-	echo "nagios utils.sh not found" &>/dev/stderr
-	exit 1
-fi
-
-KERNEL="$(uname -s)"
-case "$KERNEL" in
-	# For solaris FSF=4 MF=3 FSTAB=/etc/vfstab MTAB=/etc/mnttab gnu grep and bash required
-	SunOS)
-		FSF="4"
-		MF="3"
-		OF="6"
-		NOAUTOSTR="no"
-		FSTAB="/etc/vfstab"
-		MTAB="/etc/mnttab"
-		GREP="ggrep"
-		STAT="stat"
-		;;
-	HP-UX)
-		FSF="3"
-		MF="2"
-		OF="4"
-		NOAUTOSTR="noauto"
-		FSTAB="/etc/fstab"
-		MTAB="/dev/mnttab"
-		GREP="grep"
-		STAT="stat"
-		;;
-	FreeBSD)
-		FSF="3"
-		MF="2"
-		OF="4"
-		NOAUTOSTR="noauto"
-		FSTAB="/etc/fstab"
-		MTAB="none"
-		GREP="grep"
-		STAT="stat"
-		;;
-	*)
-		FSF="3"
-		MF="2"
-		OF="4"
-		NOAUTOSTR="noauto"
-		FSTAB="/etc/fstab"
-		MTAB="/proc/mounts"
-		GREP="grep"
-		STAT="stat"
-		;;
-esac
-
-# Time in seconds after which the check assumes that an NFS mount is staled, if
-# it does not respond. (default: 3)
-TIME_TILL_STALE="3"
-
-# --------------------------------------------------------------------
 
 
 # --------------------------------------------------------------------
 # functions
 # --------------------------------------------------------------------
-log()
+logHandler()
 {
     $LOGGER ${PROGNAME} "$@"
 }
@@ -323,11 +238,11 @@ isInteger()
 
 addPerfdata()
 {
-	local MP="${1}"
+	local mp="${1}"
 	local warnstrip=
 	local critstrip=
 	local mpusage=
-	mpusage="$(timeout --signal=TERM --kill-after=1 "${TIME_TILL_STALE}" df -h -P ${MP} | tail -n1 | awk '{print $4":"$5}')"
+	mpusage="$(timeout --signal=TERM --kill-after=1 "${TIME_TILL_STALE}" df -h -P ${mp} | tail -n1 | awk '{print $4":"$5}')"
 	local mpavail="${mpusage%%:*}"
 	local mpused="${mpusage##*:}"
 	local mpusedstrip="${mpused/\%/}"
@@ -336,22 +251,22 @@ addPerfdata()
 	then
 		warnstrip="${WARN/\%/}"
 		critstrip="${CRIT/\%/}"
-		perfdata+=("'${MP}_space_avail'=$mpavail;;;; '${MP}_used_percent'=$mpused;$WARN;$CRIT;;")
+		perfdata+=("'${mp}_space_avail'=$mpavail;;;; '${mp}_used_percent'=$mpused;$WARN;$CRIT;;")
 
 		if [ "$mpusedstrip" -gt "$critstrip" ]
 		then
 			crit_cnt="$((crit_cnt + 1))"
-			outvar+=("CRIT: Mountpoint: '${MP}' used percent is higher than critical threshold (space_avail=$mpavail, used_percent=$mpused)")
+			outvar+=("CRIT: Mountpoint: '${mp}' used percent is higher than critical threshold (space_avail=$mpavail, used_percent=$mpused)")
 		elif [ "$mpusedstrip" -gt "$warnstrip" ]
 		then
 			warn_cnt="$((warn_cnt + 1))"
-			outvar+=("WARN: Mountpoint: '${MP}' used percent is higher than warning threshold (space_avail=$mpavail, used_percent=$mpused)")
+			outvar+=("WARN: Mountpoint: '${mp}' used percent is higher than warning threshold (space_avail=$mpavail, used_percent=$mpused)")
 		else
-			outvar+=("OK: Mountpoint: '${MP}' used percent is less than warning threshold (space_avail=$mpavail, used_percent=$mpused)")
+			outvar+=("OK: Mountpoint: '${mp}' used percent is less than warning threshold (space_avail=$mpavail, used_percent=$mpused)")
 		fi
 	else
-		perfdata+=("'${MP}_space_avail'=$mpavail;;;; '${MP}_used_percent'=$mpused;;;;")
-		outvar+=("OK: Mountpoint: '${MP}' (space_avail=$mpavail, used_percent=$mpused)")
+		perfdata+=("'${mp}_space_avail'=$mpavail;;;; '${mp}_used_percent'=$mpused;;;;")
+		outvar+=("OK: Mountpoint: '${mp}' (space_avail=$mpavail, used_percent=$mpused)")
 	fi
 }
 
@@ -364,44 +279,132 @@ signalHandler()
 
 	case "$signal" in
 		SIGTERM)
-			log "Caught SIGTERM, exiting script..."
+			logHandler "Caught SIGTERM, exiting script..."
 			rc="40"
 			exit "${rc}"
 			;;
 		SIGINT)
-			log "Caught SIGINT, exiting script..."
+			logHandler "Caught SIGINT, exiting script..."
 			rc="41"
 			exit "${rc}"
 			;;
 		SIGHUP)
-			log "Caught SIGHUP, exiting script..."
+			logHandler "Caught SIGHUP, exiting script..."
 			rc="42"
 			exit "${rc}"
 			;;
-		SIGABRT)
-			log "Caught SIGABRT, exiting script..."
-			rc="43"
-			exit "${rc}"
-			;;
-		SIGQUIT)
-			log "Caught SIGQUIT, exiting script..."
-			rc="44"
-			exit "${rc}"
-			;;
         ERR)
-            log "Caught ERR, at line number: '${bash_lineno}', command: '${bash_command}', exiting script..."
+            logHandler "Caught ERR, at line number: '${bash_lineno}', command: '${bash_command}', exiting script..."
             rc="45"
             exit "${rc}"
             ;;
 		EXIT)
-			log "Caught EXIT, preparing for exiting..."
+			if [ ${#ERR_MESG[*]} -ne 0 ]
+			then
+			    echo -n "CRITICAL: "
+			    for element in "${ERR_MESG[@]}"
+			    do
+			        echo -n "${element} ; "
+			    done
+			    echo
+			    exit "${STATE_CRITICAL}"
+			fi
+
+			logHandler "Caught EXIT, preparing for exiting..."
 			cleanUp
 			exit
 			;;
 		*)
-			log "Signal: '${signal}' received in function: '${FUNCNAME[0]}' but dont know what to do..."
+			logHandler "Signal: '${signal}' received in function: '${FUNCNAME[0]}' but dont know what to do..."
 			;;
 	esac
+}
+
+setConfig()
+{
+	# --------------------------------------------------------------------
+	# configuration
+	# --------------------------------------------------------------------
+	PROGNAME="$(basename "$0")"
+	PROGVERSION="3.0.0"
+	ERR_MESG=()
+	LOGGER="$(which logger) -i -p kern.warn -t"
+
+	AUTO="0"
+	AUTOIGNORE="0"
+	IGNOREFSTAB="0"
+	WRITETEST="0"
+	NOAUTOCOND="1"
+	NOAUTOIGNORE="0"
+	DFARGS=""
+	EXCLUDE="none"
+
+	export PATH="/bin:/usr/local/bin:/sbin:/usr/bin:/usr/sbin:/usr/sfw/bin"
+	LIBEXEC="/opt/nagios/libexec /usr/lib64/nagios/plugins /usr/lib/nagios/plugins /usr/lib/monitoring-plugins /usr/local/nagios/libexec /usr/local/icinga/libexec /usr/local/libexec /opt/csw/libexec/nagios-plugins /opt/plugins /usr/local/libexec/nagios/ /usr/local/ncpa/plugins"
+	for i in ${LIBEXEC}
+	do
+		if [ -r "${i}/utils.sh" ]
+		then
+			source "${i}/utils.sh"
+		fi
+	done
+
+	if [ -z "$STATE_OK" ]
+	then
+		echo "nagios utils.sh not found" &>/dev/stderr
+		exit 1
+	fi
+
+	KERNEL="$(uname -s)"
+	case "$KERNEL" in
+		# For solaris FSF=4 MF=3 FSTAB=/etc/vfstab MTAB=/etc/mnttab gnu grep and bash required
+		SunOS)
+			FSF="4"
+			MF="3"
+			OF="6"
+			NOAUTOSTR="no"
+			FSTAB="/etc/vfstab"
+			MTAB="/etc/mnttab"
+			GREP="ggrep"
+			STAT="stat"
+			;;
+		HP-UX)
+			FSF="3"
+			MF="2"
+			OF="4"
+			NOAUTOSTR="noauto"
+			FSTAB="/etc/fstab"
+			MTAB="/dev/mnttab"
+			GREP="grep"
+			STAT="stat"
+			;;
+		FreeBSD)
+			FSF="3"
+			MF="2"
+			OF="4"
+			NOAUTOSTR="noauto"
+			FSTAB="/etc/fstab"
+			MTAB="none"
+			GREP="grep"
+			STAT="stat"
+			;;
+		*)
+			FSF="3"
+			MF="2"
+			OF="4"
+			NOAUTOSTR="noauto"
+			FSTAB="/etc/fstab"
+			MTAB="/proc/mounts"
+			GREP="grep"
+			STAT="stat"
+			;;
+	esac
+
+	# Time in seconds after which the check assumes that an NFS mount is staled, if
+	# it does not respond. (default: 3)
+	TIME_TILL_STALE="3"
+
+	# --------------------------------------------------------------------
 }
 
 cleanUp()
@@ -413,9 +416,9 @@ cleanUp()
 	then
 		if rm "${TOUCHFILE}" &>/dev/null
 		then
-			log "Deleting file: '${TOUCHFILE}' was successful."
+			logHandler "Deleting file: '${TOUCHFILE}' was successful."
 		else
-			log "Deleting file: '${TOUCHFILE}' was not successful."
+			logHandler "Deleting file: '${TOUCHFILE}' was not successful."
 		fi
 	fi
 
@@ -425,9 +428,9 @@ cleanUp()
 		then
 			if rm "${MTAB}" &>/dev/null
 			then
-				log "Deleting file: '${MTAB}' was successful."
+				logHandler "Deleting file: '${MTAB}' was successful."
 			else
-				log "Deleting file: '${MTAB}' was not successful."
+				logHandler "Deleting file: '${MTAB}' was not successful."
 			fi
 		fi
 	fi
@@ -438,13 +441,18 @@ cleanUp()
 		then
 			if rm "${FSTAB}" &>/dev/null
 			then
-				log "Deleting file: '${FSTAB}' was successful."
+				logHandler "Deleting file: '${FSTAB}' was successful."
 			else
-				log "Deleting file: '${FSTAB}' was not successful."
+				logHandler "Deleting file: '${FSTAB}' was not successful."
 			fi
 		fi
 	fi
 }
+
+
+
+# set configuration
+setConfig
 
 
 # --------------------------------------------------------------------
@@ -557,46 +565,46 @@ outvar=()
 crit_cnt="0"
 warn_cnt="0"
 
-# ZFS file system have no fstab. Make on
-if [ -x '/sbin/zfs' ]
+# ZFS file system have no fstab. Make one
+if [ -x "/sbin/zfs" ]
 then
 	TMPTAB="$(mktemp)"
 	cat "${FSTAB}" > "${TMPTAB}"
-	for DS in $(zfs list -H -o name -t filesystem)
+	for ds in $(zfs list -H -o name -t filesystem)
 	do
-		MP="$(zfs get -H mountpoint ${DS} | awk '{print $3}')"
+		mp="$(zfs get -H mountpoint ${ds} | awk '{print $3}')"
 		# mountpoint ~ "none|legacy|-"
-		if [ ! -d "$MP" ]
+		if [ ! -d "$mp" ]
 		then
 			continue
 		fi
-		if [ "$(zfs get -H canmount ${DS} | awk '{print $3}')" == "off" ]
+		if [ "$(zfs get -H canmount ${ds} | awk '{print $3}')" == "off" ]
 		then
 			continue
 		fi
 		case "$KERNEL" in
 			SunOS)
-				if [ "$(zfs get -H zoned ${DS} | awk '{print $3}')" == "on" ]
+				if [ "$(zfs get -H zoned ${ds} | awk '{print $3}')" == "on" ]
 				then
 					continue
 				fi
 				;;
 			FreeBSD)
-				if [ "$(zfs get -H jailed ${DS} | awk '{print $3}')" == "on" ]
+				if [ "$(zfs get -H jailed ${ds} | awk '{print $3}')" == "on" ]
 				then
 					continue
 				fi
 				;;
 		esac
 
-		RO="$(zfs get -H readonly ${DS} | awk '($3 == "on"){print "ro"}')"
+		ro="$(zfs get -H readonly ${ds} | awk '($3 == "on"){print "ro"}')"
 
-		if [ -z "$RO" ]
+		if [ -z "$ro" ]
 		then
-			RO="rw"
+			ro="rw"
 		fi
 
-		echo -e "$DS\t$MP\tzfs\t$RO\t0\t0" >> "${TMPTAB}"
+		echo -e "${ds}\t${mp}\tzfs\t${ro}\t0\t0" >> "${TMPTAB}"
 	done
 
 	FSTAB="${TMPTAB}"
@@ -623,7 +631,7 @@ then
 	exit "${STATE_OK}"
 elif [ -z "${MPS}"  ]
 then
-    log "ERROR: no mountpoints given!"
+    logHandler "ERROR: no mountpoints given!"
     echo "ERROR: no mountpoints given!"
     printUsage
     exit "${STATE_UNKNOWN}"
@@ -631,9 +639,9 @@ fi
 
 if [ ! -f /proc/mounts ] && [ "${MTAB}" == "/proc/mounts" ]
 then
-    log "CRIT: /proc wasn't mounted!"
+    logHandler "CRIT: /proc wasn't mounted!"
     mount -t proc proc /proc
-    ERR_MESG[${#ERR_MESG[*]}]="CRIT: mounted /proc $?"
+    ERR_MESG+=("CRIT: mounted /proc $?")
 fi
 
 if [ "${MTAB}" == "none" ]
@@ -643,7 +651,7 @@ fi
 
 if [ ! -e "${MTAB}" ]
 then
-    log "CRIT: ${MTAB} doesn't exist!"
+    logHandler "CRIT: ${MTAB} doesn't exist!"
     echo "CRIT: ${MTAB} doesn't exist!"
     exit "${STATE_CRITICAL}"
 fi
@@ -663,77 +671,77 @@ fi
 #  5) ... is writable (optional)
 # --------------------------------------------------------------------
 mpidx="0"
-for MP in ${MPS}
+for mp in ${MPS}
 do
     ## If its an OpenVZ Container or -a Mode is selected skip fstab check.
     ## -a Mode takes mounts from fstab, we do not have to check if they exist in fstab ;)
     if [ ! -f /proc/vz/veinfo ] && [ "${AUTO}" -ne 1 ] && [ "${IGNOREFSTAB}" -ne 1 ]
     then
-        if [ -z "$( "${GREP}" -v '^#' "${FSTAB}" | awk '$'${MF}' == "'${MP}'" {print $'${MF}'}' )" ]
+        if [ -z "$( "${GREP}" -v '^#' "${FSTAB}" | awk '$'${MF}' == "'${mp}'" {print $'${MF}'}' )" ]
         then
-            log "CRIT: ${MP} doesn't exist in /etc/fstab"
-            ERR_MESG[${#ERR_MESG[*]}]="${MP} doesn't exist in fstab ${FSTAB}"
+            logHandler "CRIT: ${mp} doesn't exist in /etc/fstab"
+            ERR_MESG+="${mp} doesn't exist in fstab ${FSTAB}"
         fi
     fi
 
         ## check kernel mounts
-        if [ -z "$( awk '$'${MF}' == "'${MP}'" {print $'${MF}'}' "${MTAB}" )" ]
+        if [ -z "$( awk '$'${MF}' == "'${mp}'" {print $'${MF}'}' "${MTAB}" )" ]
         then
 			## if a softlink is not an adequate replacement
-			if [ -z "$LINKOK" ] || [ ! -L "${MP}" ]
+			if [ -z "$LINKOK" ] || [ ! -L "${mp}" ]
 			then
-                log "CRIT: ${MP} is not mounted"
-                ERR_MESG[${#ERR_MESG[*]}]="${MP} is not mounted"
+                logHandler "CRIT: ${mp} is not mounted"
+                ERR_MESG+="${mp} is not mounted"
             fi
         fi
 
         ## check if it stales
-        timeout --signal=TERM --kill-after=1 "${TIME_TILL_STALE}" df -k "${DFARGS}" "${MP}" &>/dev/null
-        RC="${?}"
+        timeout --signal=TERM --kill-after=1 "${TIME_TILL_STALE}" df -k "${DFARGS}" "${mp}" &>/dev/null
+        rc="${?}"
 
-        if [ "${RC}" == "124" ]
+        if [ "${rc}" == "124" ]
         then
-            ERR_MESG[${#ERR_MESG[*]}]="${MP} did not respond in $TIME_TILL_STALE sec. Seems to be stale."
+            ERR_MESG+="${mp} did not respond in $TIME_TILL_STALE sec. Seems to be stale."
         else
 			## if it not stales, check if it is a directory
-			ISRW="0"
-            if [ ! -d "${MP}" ]
+			is_rw="0"
+            if [ ! -d "${mp}" ]
             then
-                log "CRIT: ${MP} doesn't exist on filesystem"
-                ERR_MESG[${#ERR_MESG[*]}]="${MP} doesn't exist on filesystem"
+                logHandler "CRIT: ${mp} doesn't exist on filesystem"
+                ERR_MESG+="${mp} doesn't exist on filesystem"
                 ## if wanted, check if it is writable
 			elif [ ${WRITETEST} -eq 1 ]
 			then
-                ISRW="1"
+                is_rw="1"
 				## in auto mode first check if it's readonly
 			elif [ "${WRITETEST}" -eq 1 ] && [ "${AUTO}" -eq 1 ]
 			then
-				ISRW="1"
-				for OPT in $(${GREP} -w ${MP} ${FSTAB} | awk '{print $4}'| sed -e 's/,/ /g')
+				is_rw="1"
+				for OPT in $(${GREP} -w ${mp} ${FSTAB} | awk '{print $4}'| sed -e 's/,/ /g')
 				do
 					if [ "$OPT" == "ro" ]
 					then
-						ISRW="0"
-                        log "CRIT: ${TOUCHFILE} is not mounted as writable."
-                        ERR_MESG[${#ERR_MESG[*]}]="Could not write in ${MP} filesystem was mounted RO."
+						is_rw="0"
+                        logHandler "CRIT: ${TOUCHFILE} is not mounted as writable."
+                        ERR_MESG+="Could not write in ${mp} filesystem was mounted RO."
 					fi
 				done
 			fi
-			if [ "${ISRW}" -eq 1 ]
+			if [ "${is_rw}" -eq 1 ]
 			then
-				TOUCHFILE="${MP}/.mount_test_from_$(hostname)_$(date +%Y-%m-%d--%H-%M-%S).$RANDOM.$$"
+				TOUCHFILE="${mp}/.mount_test_from_$(hostname)_$(date +%Y-%m-%d--%H-%M-%S).$RANDOM.$$"
 				timeout --signal=TERM --kill-after=1 "${TIME_TILL_STALE}" touch "${TOUCHFILE}" &>/dev/null
-				RC="${?}"
+				rc="${?}"
 
-        		if [ "${RC}" == "124" ]
+        		if [ "${rc}" == "124" ]
         		then
-					log "CRIT: ${TOUCHFILE} is not writable."
-					ERR_MESG[${#ERR_MESG[*]}]="Could not write in ${MP} in $TIME_TILL_STALE sec. Seems to be stale."
+					logHandler "CRIT: ${TOUCHFILE} is not writable."
+					ERR_MESG+="Could not write in ${mp} in $TIME_TILL_STALE sec. Seems to be stale."
 				else
 					if [ ! -f "${TOUCHFILE}" ]
 					then
-						log "CRIT: ${TOUCHFILE} is not writable."
-						ERR_MESG[${#ERR_MESG[*]}]="Could not write in ${MP}."
+						logHandler "CRIT: ${TOUCHFILE} is not writable."
+						ERR_MESG+="Could not write in ${mp}."
 					else
 						rm "${TOUCHFILE}" &>/dev/null
 					fi
@@ -741,7 +749,7 @@ do
             fi
         fi
 
-		addPerfdata "${MP}"
+		addPerfdata "${mp}"
 
         # Check for FS type using stat
         efstype="${fstypes[$mpidx]}"
@@ -752,17 +760,17 @@ do
             continue
         fi
 
-        if ! rfstype="$(${STAT} -f --printf='%T' "${MP}")"
+        if ! rfstype="$(${STAT} -f --printf='%T' "${mp}")"
         then
-            log "CRIT: Fail to fetch FS type for ${MP}"
-            ERR_MESG[${#ERR_MESG[*]}]="Fail to fetch FS type for ${MP}"
+            logHandler "CRIT: Fail to fetch FS type for ${mp}"
+            ERR_MESG+=("Fail to fetch FS type for ${mp}")
             continue
         fi
 
         if [ "${rfstype}" != "${efstype}" ]
         then
-            log "CRIT: Bad FS type for ${MP}"
-            ERR_MESG[${#ERR_MESG[*]}]="Bad FS type for ${MP}. Got '${rfstype}' while '${efstype}' was expected"
+            logHandler "CRIT: Bad FS type for ${mp}"
+            ERR_MESG+=("Bad FS type for ${mp}. Got '${rfstype}' while '${efstype}' was expected")
             continue
         fi
 done
@@ -783,19 +791,19 @@ else
 	if [ "$crit_cnt" -gt 0 ]
 	then
 		echo "CRIT: All mounts (${MPS[*]}) were found, but critical threshold exceeded."
-		STATE="$STATE_CRITICAL"
+		state="$STATE_CRITICAL"
 	elif [ "$warn_cnt" -gt 0 ]
 	then
 		echo "WARN: All mounts (${MPS[*]}) were found, but warning threshold exceeded."
-		STATE="$STATE_WARNING"
+		state="$STATE_WARNING"
 	else
 		if [ -n "$WARN" ] && [ -n "$CRIT" ]
 		then
 			echo "OK: All mounts (${MPS[*]}) were found, no thresholds exceeded."
-			STATE="$STATE_OK"
+			state="$STATE_OK"
 		else
 			echo "OK: All mounts (${MPS[*]}) were found, no thresholds defined."
-			STATE="$STATE_OK"
+			state="$STATE_OK"
 		fi
 	fi
 
@@ -805,5 +813,5 @@ else
 	done
 
 	echo "| ${perfdata[*]}"
-	exit "${STATE}"
+	exit "${state}"
 fi
