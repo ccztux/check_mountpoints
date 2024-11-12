@@ -664,7 +664,7 @@ fi
 #  4) ... exist on the filesystem
 #  5) ... is writable (optional)
 # --------------------------------------------------------------------
-mpidx=0
+mpidx="0"
 for MP in ${MPS}
 do
     ## If its an OpenVZ Container or -a Mode is selected skip fstab check.
@@ -690,21 +690,11 @@ do
         fi
 
         ## check if it stales
-        df -k ${DFARGS} ${MP} &>/dev/null &
-        DFPID=$!
-        disown
-        for (( i=1 ; i<$TIME_TILL_STALE ; i++ ))
-        do
-            if ps -p $DFPID > /dev/null
-            then
-                sleep 1
-            else
-                break
-            fi
-        done
-        if ps -p $DFPID > /dev/null
+        timeout --signal=TERM --kill-after=1 ${TIME_TILL_STALE} df -k ${DFARGS} ${MP} &>/dev/null
+        RC="${?}"
+
+        if [ "${RC}" == "124" ]
         then
-            $(kill -s SIGTERM $DFPID &>/dev/null)
             ERR_MESG[${#ERR_MESG[*]}]="${MP} did not respond in $TIME_TILL_STALE sec. Seems to be stale."
         else
 			## if it not stales, check if it is a directory
@@ -733,21 +723,12 @@ do
 			fi
 			if [ ${ISRW} -eq 1 ]
 			then
-				TOUCHFILE=${MP}/.mount_test_from_$(hostname)_$(date +%Y-%m-%d--%H-%M-%S).$RANDOM.$$
-				touch ${TOUCHFILE} &>/dev/null &
-				TOUCHPID=$!
-				for (( i=1 ; i<$TIME_TILL_STALE ; i++ ))
-				do
-					if ps -p $TOUCHPID > /dev/null
-					then
-						sleep 1
-					else
-						break
-					fi
-				done
-				if ps -p $TOUCHPID > /dev/null
-				then
-					$(kill -s SIGTERM $TOUCHPID &>/dev/null)
+				TOUCHFILE="${MP}/.mount_test_from_$(hostname)_$(date +%Y-%m-%d--%H-%M-%S).$RANDOM.$$"
+				timeout --signal=TERM --kill-after=1 ${TIME_TILL_STALE} touch "${TOUCHFILE}" &>/dev/null
+				RC="${?}"
+
+        		if [ "${RC}" == "124" ]
+        		then
 					log "CRIT: ${TOUCHFILE} is not writable."
 					ERR_MESG[${#ERR_MESG[*]}]="Could not write in ${MP} in $TIME_TILL_STALE sec. Seems to be stale."
 				else
@@ -756,7 +737,7 @@ do
 						log "CRIT: ${TOUCHFILE} is not writable."
 						ERR_MESG[${#ERR_MESG[*]}]="Could not write in ${MP}."
 					else
-						rm ${TOUCHFILE} &>/dev/null
+						rm "${TOUCHFILE}" &>/dev/null
 					fi
 				fi
             fi
@@ -765,14 +746,14 @@ do
 		add_perfdata "${MP}"
         # Check for FS type using stat
         efstype=${fstypes[$mpidx]}
-        ((mpidx++))
+        mpidx="$(( mpidx + 1 ))"
 
         if [ -z "${efstype}" ]
         then
             continue
         fi
 
-        rfstype=$(${STAT} -f --printf='%T' "${MP}")
+        rfstype="$(${STAT} -f --printf='%T' "${MP}")"
         if [ $? -ne 0 ]
         then
             log "CRIT: Fail to fetch FS type for ${MP}"
@@ -793,7 +774,7 @@ do
         echo -n "CRITICAL: "
         for element in "${ERR_MESG[@]}"
         do
-            echo -n ${element}" ; "
+            echo -n "${element} ; "
         done
         echo
         exit "${STATE_CRITICAL}"
