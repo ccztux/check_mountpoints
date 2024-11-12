@@ -572,40 +572,40 @@ then
 	cat ${FSTAB} > ${TMPTAB}
 	for DS in $(zfs list -H -o name -t filesystem)
 	do
-		MP=$(zfs get -H mountpoint ${DS} |awk '{print $3}')
+		MP=$(zfs get -H mountpoint ${DS} | awk '{print $3}')
 		# mountpoint ~ "none|legacy|-"
 		if [ ! -d "$MP" ]
 		then
 			continue
 		fi
-		if [ $(zfs get -H canmount ${DS} |awk '{print $3}') == 'off' ]
+		if [ "$(zfs get -H canmount ${DS} | awk '{print $3}')" == "off" ]
 		then
 			continue
 		fi
 		case $KERNEL in
 			SunOS)
-				if [ $(zfs get -H zoned ${DS} |awk '{print $3}') == 'on' ]
+				if [ "$(zfs get -H zoned ${DS} | awk '{print $3}')" == "on" ]
 				then
 					continue
 				fi
 				;;
 			FreeBSD)
-				if [ $(zfs get -H jailed ${DS} |awk '{print $3}') == 'on' ]
+				if [ "$(zfs get -H jailed ${DS} | awk '{print $3}')" == "on" ]
 				then
 					continue
 				fi
 				;;
 		esac
-		RO=$(zfs get -H readonly ${DS} |awk '($3 == "on"){print "ro"}')
+		RO="$(zfs get -H readonly ${DS} | awk '($3 == "on"){print "ro"}')"
 		[ -z "$RO" ] &&  RO='rw'
 		echo -e "$DS\t$MP\tzfs\t$RO\t0\t0" >> ${TMPTAB}
 	done
 	FSTAB=${TMPTAB}
 fi
 
-if [ ${AUTO} -eq 1 ]
+if [ "${AUTO}" -eq 1 ]
 then
-    if [ ${NOAUTOIGNORE} -eq 1 ]
+    if [ "${NOAUTOIGNORE}" -eq 1 ]
     then
         NOAUTOCOND='!index($'${OF}',"'${NOAUTOSTR}'")'
     fi
@@ -638,7 +638,7 @@ fi
 
 if [ "${MTAB}" == "none" ]
 then
-	MTAB=$(make_mtab)
+	MTAB="$(make_mtab)"
 fi
 
 if [ ! -e "${MTAB}" ]
@@ -651,9 +651,7 @@ fi
 if [ -n "${FSTYPE}" ]
 then
     # split on commas
-    oIFS=$IFS
-    IFS=, read -a fstypes <<<"${FSTYPE}"
-    IFS=$oIFS
+    IFS="," read -r -a fstypes <<<"${FSTYPE}"
 fi
 
 # --------------------------------------------------------------------
@@ -711,7 +709,7 @@ do
 			elif [ ${WRITETEST} -eq 1 ] && [ ${AUTO} -eq 1 ]
 			then
 				ISRW=1
-				for OPT in $(${GREP} -w ${MP} ${FSTAB} |awk '{print $4}'| sed -e 's/,/ /g')
+				for OPT in $(${GREP} -w ${MP} ${FSTAB} | awk '{print $4}'| sed -e 's/,/ /g')
 				do
 					if [ "$OPT" == 'ro' ]
 					then
