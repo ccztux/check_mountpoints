@@ -568,11 +568,11 @@ warn_cnt="0"
 # ZFS file system have no fstab. Make on
 if [ -x '/sbin/zfs' ]
 then
-	TMPTAB=$(mktemp)
-	cat ${FSTAB} > ${TMPTAB}
+	TMPTAB="$(mktemp)"
+	cat "${FSTAB}" > "${TMPTAB}"
 	for DS in $(zfs list -H -o name -t filesystem)
 	do
-		MP=$(zfs get -H mountpoint ${DS} | awk '{print $3}')
+		MP="$(zfs get -H mountpoint ${DS} | awk '{print $3}')"
 		# mountpoint ~ "none|legacy|-"
 		if [ ! -d "$MP" ]
 		then
@@ -582,7 +582,7 @@ then
 		then
 			continue
 		fi
-		case $KERNEL in
+		case "$KERNEL" in
 			SunOS)
 				if [ "$(zfs get -H zoned ${DS} | awk '{print $3}')" == "on" ]
 				then
@@ -697,7 +697,7 @@ do
         else
 			## if it not stales, check if it is a directory
 			ISRW=0
-            if [ ! -d ${MP} ]
+            if [ ! -d "${MP}" ]
             then
                 log "CRIT: ${MP} doesn't exist on filesystem"
                 ERR_MESG[${#ERR_MESG[*]}]="${MP} doesn't exist on filesystem"
@@ -730,7 +730,7 @@ do
 					log "CRIT: ${TOUCHFILE} is not writable."
 					ERR_MESG[${#ERR_MESG[*]}]="Could not write in ${MP} in $TIME_TILL_STALE sec. Seems to be stale."
 				else
-					if [ ! -f ${TOUCHFILE} ]
+					if [ ! -f "${TOUCHFILE}" ]
 					then
 						log "CRIT: ${TOUCHFILE} is not writable."
 						ERR_MESG[${#ERR_MESG[*]}]="Could not write in ${MP}."
@@ -742,8 +742,9 @@ do
         fi
 
 		add_perfdata "${MP}"
+
         # Check for FS type using stat
-        efstype=${fstypes[$mpidx]}
+        efstype="${fstypes[$mpidx]}"
         mpidx="$(( mpidx + 1 ))"
 
         if [ -z "${efstype}" ]
@@ -751,8 +752,7 @@ do
             continue
         fi
 
-        rfstype="$(${STAT} -f --printf='%T' "${MP}")"
-        if [ $? -ne 0 ]
+        if ! rfstype="$(${STAT} -f --printf='%T' "${MP}")"
         then
             log "CRIT: Fail to fetch FS type for ${MP}"
             ERR_MESG[${#ERR_MESG[*]}]="Fail to fetch FS type for ${MP}"
