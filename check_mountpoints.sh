@@ -410,10 +410,7 @@ cleanup()
 	# Remove temporary files
 	if [ -f "${TOUCHFILE}" ]
 	then
-		rm "${TOUCHFILE}" &>/dev/null
-		rc="$?"
-
-		if [ "$rc" == "0" ]
+		if rm "${TOUCHFILE}" &>/dev/null
 		then
 			log "Deleting file: '${TOUCHFILE}' was successful."
 		else
@@ -425,10 +422,7 @@ cleanup()
 	then
 		if [ -f "${MTAB}" ]
 		then
-			rm "${MTAB}" &>/dev/null
-			rc="$?"
-
-			if [ "$rc" == "0" ]
+			if rm "${MTAB}" &>/dev/null
 			then
 				log "Deleting file: '${MTAB}' was successful."
 			else
@@ -441,10 +435,7 @@ cleanup()
 	then
 		if [ -f "${FSTAB}" ]
 		then
-			rm "${FSTAB}" &>/dev/null
-			rc="$?"
-
-			if [ "$rc" == "0" ]
+			if rm "${FSTAB}" &>/dev/null
 			then
 				log "Deleting file: '${FSTAB}' was successful."
 			else
@@ -596,11 +587,18 @@ then
 				fi
 				;;
 		esac
+
 		RO="$(zfs get -H readonly ${DS} | awk '($3 == "on"){print "ro"}')"
-		[ -z "$RO" ] &&  RO='rw'
-		echo -e "$DS\t$MP\tzfs\t$RO\t0\t0" >> ${TMPTAB}
+
+		if [ -z "$RO" ]
+		then
+			RO="rw"
+		fi
+
+		echo -e "$DS\t$MP\tzfs\t$RO\t0\t0" >> "${TMPTAB}"
 	done
-	FSTAB=${TMPTAB}
+
+	FSTAB="${TMPTAB}"
 fi
 
 if [ "${AUTO}" -eq 1 ]
@@ -609,6 +607,7 @@ then
     then
         NOAUTOCOND='!index($'${OF}',"'${NOAUTOSTR}'")'
     fi
+
 	if [ "${EXCLUDE}" == "none" ]
 	then
 		MPS="$(${GREP} -v '^#' ${FSTAB} | awk '{if ('${NOAUTOCOND}'&&($'${FSF}'=="ext2" || $'${FSF}'=="ext3" || $'${FSF}'=="xfs" || $'${FSF}'=="auto" || $'${FSF}'=="ext4" || $'${FSF}'=="nfs" || $'${FSF}'=="nfs4" || $'${FSF}'=="davfs" || $'${FSF}'=="cifs" || $'${FSF}'=="fuse" || $'${FSF}'=="glusterfs" || $'${FSF}'=="ocfs2" || $'${FSF}'=="lustre" || $'${FSF}'=="ufs" || $'${FSF}'=="zfs" || $'${FSF}'=="ceph" || $'${FSF}'=="btrfs" || $'${FSF}'=="yas3fs"))print $'${MF}'}' | sed -e 's/\/$//i' | tr '\n' ' ')"
@@ -617,7 +616,7 @@ then
 	fi
 fi
 
-if [ -z "${MPS}"  ] && [ ${AUTOIGNORE} -eq 1 ]
+if [ -z "${MPS}"  ] && [ "${AUTOIGNORE}" -eq 1 ]
 then
 	echo "OK: no external mounts were found in ${FSTAB}"
 	exit "${STATE_OK}"
@@ -680,7 +679,7 @@ do
         if [ -z "$( awk '$'${MF}' == "'${MP}'" {print $'${MF}'}' "${MTAB}" )" ]
         then
 			## if a softlink is not an adequate replacement
-			if [ -z "$LINKOK" ] || [ ! -L ${MP} ]
+			if [ -z "$LINKOK" ] || [ ! -L "${MP}" ]
 			then
                 log "CRIT: ${MP} is not mounted"
                 ERR_MESG[${#ERR_MESG[*]}]="${MP} is not mounted"
@@ -688,7 +687,7 @@ do
         fi
 
         ## check if it stales
-        timeout --signal=TERM --kill-after=1 ${TIME_TILL_STALE} df -k ${DFARGS} ${MP} &>/dev/null
+        timeout --signal=TERM --kill-after=1 "${TIME_TILL_STALE}" df -k "${DFARGS}" "${MP}" &>/dev/null
         RC="${?}"
 
         if [ "${RC}" == "124" ]
@@ -722,7 +721,7 @@ do
 			if [ ${ISRW} -eq 1 ]
 			then
 				TOUCHFILE="${MP}/.mount_test_from_$(hostname)_$(date +%Y-%m-%d--%H-%M-%S).$RANDOM.$$"
-				timeout --signal=TERM --kill-after=1 ${TIME_TILL_STALE} touch "${TOUCHFILE}" &>/dev/null
+				timeout --signal=TERM --kill-after=1 "${TIME_TILL_STALE}" touch "${TOUCHFILE}" &>/dev/null
 				RC="${?}"
 
         		if [ "${RC}" == "124" ]
