@@ -253,12 +253,12 @@ print_help()
 # Format is dev mountpoint filesystem
 make_mtab()
 {
-	mtab=$(mktemp)
-	mount > $mtab
-	sed -i '' 's/ on / /' $mtab
-	sed -i '' 's/ (/ /' $mtab
-	sed -i '' 's/,.*/ /' $mtab
-	echo $mtab
+	mtab="$(mktemp)"
+	mount > "${mtab}"
+	sed -i '' 's/ on / /' "${mtab}"
+	sed -i '' 's/ (/ /' "${mtab}"
+	sed -i '' 's/,.*/ /' "${mtab}"
+	echo "${mtab}"
 }
 
 check_options()
@@ -268,13 +268,13 @@ check_options()
 		echo "You have defined only a critical threshold, you must define warning and critical threshold!"
 		echo
 		usage
-		exit $EXIT_UNKNOWN
+		exit "${EXIT_UNKNOWN}"
 	elif [ -n "$WARN" ] && [ -z "$CRIT" ]
 	then
 		echo "You have defined only a warning threshold, you must define warning and critical threshold!"
 		echo
 		usage
-		exit $EXIT_UNKNOWN
+		exit "${EXIT_UNKNOWN}"
 	elif [ -n "$WARN" ] && [ -n "$CRIT" ]
 	then
 		if ! is_integer "$WARN"
@@ -282,7 +282,7 @@ check_options()
 			echo "The warning threshold: '$WARN' is not an integer!"
 			echo
 			usage
-			exit $EXIT_UNKNOWN
+			exit "${EXIT_UNKNOWN}"
 		fi
 
 		if ! is_integer "$CRIT"
@@ -290,7 +290,7 @@ check_options()
 			echo "The critical threshold: '$CRIT' is not an integer!"
 			echo
 			usage
-			exit $EXIT_UNKNOWN
+			exit "${EXIT_UNKNOWN}"
 		fi
 
 		if [ "$WARN" -gt "$CRIT" ]
@@ -298,7 +298,7 @@ check_options()
 			echo "The warning threshold: '$WARN' is greater than the critical threshold: '$CRIT'."
 			echo
 			usage
-			exit $EXIT_UNKNOWN
+			exit "${EXIT_UNKNOWN}"
 		fi
 	fi
 }
@@ -365,32 +365,32 @@ sig_handler()
 		SIGTERM)
 			log "Caught SIGTERM, exiting script..."
 			rc="40"
-			exit $rc
+			exit "${rc}"
 			;;
 		SIGINT)
 			log "Caught SIGINT, exiting script..."
 			rc="41"
-			exit $rc
+			exit "${rc}"
 			;;
 		SIGHUP)
 			log "Caught SIGHUP, exiting script..."
 			rc="42"
-			exit $rc
+			exit "${rc}"
 			;;
 		SIGABRT)
 			log "Caught SIGABRT, exiting script..."
 			rc="43"
-			exit $rc
+			exit "${rc}"
 			;;
 		SIGQUIT)
 			log "Caught SIGQUIT, exiting script..."
 			rc="44"
-			exit $rc
+			exit "${rc}"
 			;;
         ERR)
             log "Caught ERR, at line number: '${bash_lineno}', command: '${bash_command}', exiting script..."
             rc="45"
-            exit $rc
+            exit "${rc}"
             ;;
 		EXIT)
 			log "Caught EXIT, preparing for exiting..."
@@ -462,7 +462,7 @@ cleanup()
 if [ $# -eq 0 ]
 then
     usage
-    exit $STATE_CRITICAL
+    exit "${STATE_CRITICAL}"
 fi
 
 while [ "$1" != "" ]
@@ -487,11 +487,11 @@ do
 			;;
         --help)
 			print_help
-			exit $STATE_OK
+			exit "${STATE_OK}"
 			;;
         -h)
 			print_help
-			exit $STATE_OK
+			exit "${STATE_OK}"
 			;;
         -m)
 			MTAB=$2
@@ -551,7 +551,7 @@ do
 			;;
         *)
 			usage
-			exit $STATE_UNKNOWN
+			exit "${STATE_UNKNOWN}"
 			;;
     esac
 done
@@ -620,13 +620,13 @@ fi
 if [ -z "${MPS}"  ] && [ ${AUTOIGNORE} -eq 1 ]
 then
 	echo "OK: no external mounts were found in ${FSTAB}"
-	exit $STATE_OK
+	exit "${STATE_OK}"
 elif [ -z "${MPS}"  ]
 then
     log "ERROR: no mountpoints given!"
     echo "ERROR: no mountpoints given!"
     usage
-    exit $STATE_UNKNOWN
+    exit "${STATE_UNKNOWN}"
 fi
 
 if [ ! -f /proc/mounts ] && [ "${MTAB}" == "/proc/mounts" ]
@@ -645,7 +645,7 @@ if [ ! -e "${MTAB}" ]
 then
     log "CRIT: ${MTAB} doesn't exist!"
     echo "CRIT: ${MTAB} doesn't exist!"
-    exit $STATE_CRITICAL
+    exit "${STATE_CRITICAL}"
 fi
 
 if [ -n "${FSTYPE}" ]
@@ -796,7 +796,7 @@ do
             echo -n ${element}" ; "
         done
         echo
-        exit $STATE_CRITICAL
+        exit "${STATE_CRITICAL}"
 	else
 		MPS="$(trim ${MPS[*]})"
 		MPS="${MPS// /, }"
@@ -826,5 +826,5 @@ do
 		done
 
 		echo "| ${perfdata[*]}"
-		exit $STATE
+		exit "${STATE}"
 	fi
