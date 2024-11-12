@@ -255,11 +255,11 @@ addPerfdata()
 		if [ "$mpusedstrip" -gt "$critstrip" ]
 		then
 			crit_cnt="$(( crit_cnt + 1 ))"
-			outvar+=("CRIT: Mountpoint: '${mp}' used percent is higher than critical threshold (space_avail=$mpavail, used_percent=$mpused)")
+			outvar+=("CRITICAL: Mountpoint: '${mp}' used percent is higher than critical threshold (space_avail=$mpavail, used_percent=$mpused)")
 		elif [ "$mpusedstrip" -gt "$warnstrip" ]
 		then
 			warn_cnt="$(( warn_cnt + 1 ))"
-			outvar+=("WARN: Mountpoint: '${mp}' used percent is higher than warning threshold (space_avail=$mpavail, used_percent=$mpused)")
+			outvar+=("WARNING: Mountpoint: '${mp}' used percent is higher than warning threshold (space_avail=$mpavail, used_percent=$mpused)")
 		else
 			outvar+=("OK: Mountpoint: '${mp}' used percent is less than warning threshold (space_avail=$mpavail, used_percent=$mpused)")
 		fi
@@ -272,45 +272,47 @@ addPerfdata()
 signalHandler()
 {
 	local signal="$1"
-	local rc=
 
 	case "$signal" in
 		SIGTERM)
 			logHandler "Caught SIGTERM, exiting script..."
-			rc="40"
-			exit "${rc}"
+                        exit
 			;;
 		SIGINT)
 			logHandler "Caught SIGINT, exiting script..."
-			rc="41"
-			exit "${rc}"
+                        exit
 			;;
 		SIGHUP)
 			logHandler "Caught SIGHUP, exiting script..."
-			rc="42"
-			exit "${rc}"
+                        exit
 			;;
 		EXIT)
+			logHandler "Caught EXIT, preparing for exiting..."
+			cleanUp
+
 			if [ ${#ERR_MESG[*]} -ne 0 ]
 			then
 			    echo -n "CRITICAL: "
 			    for element in "${ERR_MESG[@]}"
 			    do
-			        echo -n "${element} ; "
+			        echo -n "${element} , "
 			    done
 			    echo
 			    exit "${STATE_CRITICAL}"
-			else
+            fi
+
+            if [ "${bypass_exit_routine}" != "1" ]
+            then
 				MPS="$(trim ${MPS[*]})"
 				MPS="${MPS// /, }"
 
 				if [ "$crit_cnt" -gt 0 ]
 				then
-					echo "CRIT: All mounts (${MPS[*]}) were found, but critical threshold exceeded."
+					echo "CRITICAL: All mounts (${MPS[*]}) were found, but critical threshold exceeded."
 					state="$STATE_CRITICAL"
 				elif [ "$warn_cnt" -gt 0 ]
 				then
-					echo "WARN: All mounts (${MPS[*]}) were found, but warning threshold exceeded."
+					echo "WARNING: All mounts (${MPS[*]}) were found, but warning threshold exceeded."
 					state="$STATE_WARNING"
 				else
 					if [ -n "$WARN" ] && [ -n "$CRIT" ]
@@ -328,12 +330,14 @@ signalHandler()
 					echo "${item}"
 				done
 
-				echo "| ${perfdata[*]}"
+				if [ "${#perfdata[@]}" -ne "0" ]
+				then
+					echo "| ${perfdata[*]}"
+                fi
+
 				exit "${state}"
 			fi
 
-			logHandler "Caught EXIT, preparing for exiting..."
-			cleanUp
 			exit
 			;;
 		*)
@@ -347,6 +351,14 @@ setConfig()
 	# --------------------------------------------------------------------
 	# configuration
 	# --------------------------------------------------------------------
+
+    # set some global vars
+    bypass_exit_routine="1"
+    perfdata=()
+    outvar=()
+    crit_cnt="0"
+    warn_cnt="0"
+
 	PROGNAME="$(basename "$0")"
 	PROGVERSION="3.0.0"
 	ERR_MESG=()
@@ -580,12 +592,8 @@ done
 
 # check options
 checkOptions
+bypass_exit_routine="0"
 
-# set some global vars
-perfdata=()
-outvar=()
-crit_cnt="0"
-warn_cnt="0"
 
 # ZFS file system have no fstab. Make one
 if [ -x "/sbin/zfs" ]
@@ -661,9 +669,9 @@ fi
 
 if [ ! -f /proc/mounts ] && [ "${MTAB}" == "/proc/mounts" ]
 then
-    logHandler "CRIT: /proc wasn't mounted!"
+    logHandler "CRITICAL: /proc wasn't mounted!"
     mount -t proc proc /proc
-    ERR_MESG+=("CRIT: mounted /proc $?")
+    ERR_MESG+=("CRITICAL: mounted /proc $?")
 fi
 
 if [ "${MTAB}" == "none" ]
@@ -673,8 +681,8 @@ fi
 
 if [ ! -e "${MTAB}" ]
 then
-    logHandler "CRIT: ${MTAB} doesn't exist!"
-    echo "CRIT: ${MTAB} doesn't exist!"
+    logHandler "CRITICAL: ${MTAB} doesn't exist!"
+    echo "CRITICAL: ${MTAB} doesn't exist!"
     exit "${STATE_CRITICAL}"
 fi
 
@@ -701,7 +709,7 @@ do
     then
         if [ -z "$( "${GREP}" -v '^#' "${FSTAB}" | awk '$'${MF}' == "'${mp}'" {print $'${MF}'}' )" ]
         then
-            logHandler "CRIT: ${mp} doesn't exist in /etc/fstab"
+            logHandler "CRITICAL: ${mp} doesn't exist in /etc/fstab"
             ERR_MESG+=("${mp} doesn't exist in fstab ${FSTAB}")
         fi
     fi
@@ -712,7 +720,7 @@ do
 		## if a softlink is not an adequate replacement
 		if [ -z "$LINKOK" ] || [ ! -L "${mp}" ]
 		then
-            logHandler "CRIT: ${mp} is not mounted"
+            logHandler "CRITICAL: ${mp} is not mounted"
             ERR_MESG+=("${mp} is not mounted")
         fi
     fi
@@ -729,7 +737,7 @@ do
 		is_rw="0"
         if [ ! -d "${mp}" ]
         then
-            logHandler "CRIT: ${mp} doesn't exist on filesystem"
+            logHandler "CRITICAL: ${mp} doesn't exist on filesystem"
             ERR_MESG+=("${mp} doesn't exist on filesystem")
             ## if wanted, check if it is writable
 		elif [ ${WRITETEST} -eq 1 ]
@@ -744,7 +752,7 @@ do
 				if [ "$OPT" == "ro" ]
 				then
 					is_rw="0"
-                    logHandler "CRIT: ${TOUCHFILE} is not mounted as writable."
+                    logHandler "CRITICAL: ${TOUCHFILE} is not mounted as writable."
                     ERR_MESG+=("Could not write in ${mp} filesystem was mounted RO.")
 				fi
 			done
@@ -757,12 +765,12 @@ do
 
     		if [ "${rc}" == "124" ]
     		then
-				logHandler "CRIT: ${TOUCHFILE} is not writable."
+				logHandler "CRITICAL: ${TOUCHFILE} is not writable."
 				ERR_MESG+=("Could not write in ${mp} in $TIME_TILL_STALE sec. Seems to be stale.")
 			else
 				if [ ! -f "${TOUCHFILE}" ]
 				then
-					logHandler "CRIT: ${TOUCHFILE} is not writable."
+					logHandler "CRITICAL: ${TOUCHFILE} is not writable."
 					ERR_MESG+=("Could not write in ${mp}.")
 				else
 					rm "${TOUCHFILE}" &>/dev/null
@@ -784,15 +792,17 @@ do
 
     if ! rfstype="$(${STAT} -f --printf='%T' "${mp}")"
     then
-        logHandler "CRIT: Fail to fetch FS type for ${mp}"
+        logHandler "CRITICAL: Fail to fetch FS type for ${mp}"
         ERR_MESG+=("Fail to fetch FS type for ${mp}")
         continue
     fi
 
     if [ "${rfstype}" != "${efstype}" ]
     then
-        logHandler "CRIT: Bad FS type for ${mp}"
+        logHandler "CRITICAL: Bad FS type for ${mp}"
         ERR_MESG+=("Bad FS type for ${mp}. Got '${rfstype}' while '${efstype}' was expected")
         continue
     fi
 done
+
+exit
