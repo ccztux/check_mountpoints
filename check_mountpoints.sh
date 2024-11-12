@@ -260,19 +260,19 @@ make_mtab()
 
 check_options()
 {
-	if [ -z "$WARN" ] && [ ! -z "$CRIT" ]
+	if [ -z "$WARN" ] && [ -n "$CRIT" ]
 	then
 		echo "You have defined only a critical threshold, you must define warning and critical threshold!"
 		echo
 		usage
 		exit $EXIT_UNKNOWN
-	elif [ ! -z "$WARN" ] && [ -z "$CRIT" ]
+	elif [ -n "$WARN" ] && [ -z "$CRIT" ]
 	then
 		echo "You have defined only a warning threshold, you must define warning and critical threshold!"
 		echo
 		usage
 		exit $EXIT_UNKNOWN
-	elif [ ! -z "$WARN" ] && [ ! -z "$CRIT" ]
+	elif [ -n "$WARN" ] && [ -n "$CRIT" ]
 	then
 		if ! is_integer "$WARN"
 		then
@@ -328,7 +328,7 @@ add_perfdata()
 	local mpused="${mpusage##*:}"
 	local mpusedstrip="${mpused/\%/}"
 
-	if [ ! -z "$WARN" ] && [ ! -z "$CRIT" ]
+	if [ -n "$WARN" ] && [ -n "$CRIT" ]
 	then
 		warnstrip="${WARN/\%/}"
 		critstrip="${CRIT/\%/}"
@@ -807,7 +807,7 @@ do
 			echo "WARN: All mounts (${MPS[*]}) were found, but warning threshold exceeded."
 			STATE="$STATE_WARNING"
 		else
-			if [ ! -z "$WARN" ] && [ ! -z "$CRIT" ]
+			if [ -n "$WARN" ] && [ -n "$CRIT" ]
 			then
 				echo "OK: All mounts (${MPS[*]}) were found, no thresholds exceeded."
 				STATE="$STATE_OK"
