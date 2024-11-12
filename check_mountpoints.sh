@@ -107,7 +107,6 @@
 trap 'signalHandler SIGTERM' SIGTERM
 trap 'signalHandler SIGINT' SIGINT
 trap 'signalHandler SIGHUP' SIGHUP
-trap 'signalHandler ERR "${LINENO}" "${BASH_COMMAND}"' ERR
 trap 'signalHandler EXIT' EXIT
 
 
@@ -118,7 +117,7 @@ trap 'signalHandler EXIT' EXIT
 # --------------------------------------------------------------------
 logHandler()
 {
-    $LOGGER ${PROGNAME} "$@"
+    ${LOGGER} "${PROGNAME}" "$@"
 }
 
 printUsage()
@@ -242,7 +241,7 @@ addPerfdata()
 	local warnstrip=
 	local critstrip=
 	local mpusage=
-	mpusage="$(timeout --signal=TERM --kill-after=1 "${TIME_TILL_STALE}" df -h -P ${mp} | tail -n1 | awk '{print $4":"$5}')"
+	mpusage="$(timeout --signal=TERM --kill-after=1 "${TIME_TILL_STALE}" df -h -P "${mp}" | tail -n1 | awk '{print $4":"$5}')"
 	local mpavail="${mpusage%%:*}"
 	local mpused="${mpusage##*:}"
 	local mpusedstrip="${mpused/\%/}"
@@ -255,11 +254,11 @@ addPerfdata()
 
 		if [ "$mpusedstrip" -gt "$critstrip" ]
 		then
-			crit_cnt="$((crit_cnt + 1))"
+			crit_cnt="$(( crit_cnt + 1 ))"
 			outvar+=("CRIT: Mountpoint: '${mp}' used percent is higher than critical threshold (space_avail=$mpavail, used_percent=$mpused)")
 		elif [ "$mpusedstrip" -gt "$warnstrip" ]
 		then
-			warn_cnt="$((warn_cnt + 1))"
+			warn_cnt="$(( warn_cnt + 1 ))"
 			outvar+=("WARN: Mountpoint: '${mp}' used percent is higher than warning threshold (space_avail=$mpavail, used_percent=$mpused)")
 		else
 			outvar+=("OK: Mountpoint: '${mp}' used percent is less than warning threshold (space_avail=$mpavail, used_percent=$mpused)")
@@ -273,8 +272,6 @@ addPerfdata()
 signalHandler()
 {
 	local signal="$1"
-	local bash_lineno="$2"
-	local bash_command="$3"
 	local rc=
 
 	case "$signal" in
@@ -293,11 +290,6 @@ signalHandler()
 			rc="42"
 			exit "${rc}"
 			;;
-        ERR)
-            logHandler "Caught ERR, at line number: '${bash_lineno}', command: '${bash_command}', exiting script..."
-            rc="45"
-            exit "${rc}"
-            ;;
 		EXIT)
 			if [ ${#ERR_MESG[*]} -ne 0 ]
 			then
@@ -308,6 +300,36 @@ signalHandler()
 			    done
 			    echo
 			    exit "${STATE_CRITICAL}"
+			else
+				MPS="$(trim ${MPS[*]})"
+				MPS="${MPS// /, }"
+
+				if [ "$crit_cnt" -gt 0 ]
+				then
+					echo "CRIT: All mounts (${MPS[*]}) were found, but critical threshold exceeded."
+					state="$STATE_CRITICAL"
+				elif [ "$warn_cnt" -gt 0 ]
+				then
+					echo "WARN: All mounts (${MPS[*]}) were found, but warning threshold exceeded."
+					state="$STATE_WARNING"
+				else
+					if [ -n "$WARN" ] && [ -n "$CRIT" ]
+					then
+						echo "OK: All mounts (${MPS[*]}) were found, no thresholds exceeded."
+						state="$STATE_OK"
+					else
+						echo "OK: All mounts (${MPS[*]}) were found, no thresholds defined."
+						state="$STATE_OK"
+					fi
+				fi
+
+				for item in "${outvar[@]}"
+				do
+					echo "${item}"
+				done
+
+				echo "| ${perfdata[*]}"
+				exit "${state}"
 			fi
 
 			logHandler "Caught EXIT, preparing for exiting..."
@@ -680,138 +702,97 @@ do
         if [ -z "$( "${GREP}" -v '^#' "${FSTAB}" | awk '$'${MF}' == "'${mp}'" {print $'${MF}'}' )" ]
         then
             logHandler "CRIT: ${mp} doesn't exist in /etc/fstab"
-            ERR_MESG+="${mp} doesn't exist in fstab ${FSTAB}"
+            ERR_MESG+=("${mp} doesn't exist in fstab ${FSTAB}")
         fi
     fi
 
-        ## check kernel mounts
-        if [ -z "$( awk '$'${MF}' == "'${mp}'" {print $'${MF}'}' "${MTAB}" )" ]
-        then
-			## if a softlink is not an adequate replacement
-			if [ -z "$LINKOK" ] || [ ! -L "${mp}" ]
-			then
-                logHandler "CRIT: ${mp} is not mounted"
-                ERR_MESG+="${mp} is not mounted"
-            fi
-        fi
-
-        ## check if it stales
-        timeout --signal=TERM --kill-after=1 "${TIME_TILL_STALE}" df -k "${DFARGS}" "${mp}" &>/dev/null
-        rc="${?}"
-
-        if [ "${rc}" == "124" ]
-        then
-            ERR_MESG+="${mp} did not respond in $TIME_TILL_STALE sec. Seems to be stale."
-        else
-			## if it not stales, check if it is a directory
-			is_rw="0"
-            if [ ! -d "${mp}" ]
-            then
-                logHandler "CRIT: ${mp} doesn't exist on filesystem"
-                ERR_MESG+="${mp} doesn't exist on filesystem"
-                ## if wanted, check if it is writable
-			elif [ ${WRITETEST} -eq 1 ]
-			then
-                is_rw="1"
-				## in auto mode first check if it's readonly
-			elif [ "${WRITETEST}" -eq 1 ] && [ "${AUTO}" -eq 1 ]
-			then
-				is_rw="1"
-				for OPT in $(${GREP} -w ${mp} ${FSTAB} | awk '{print $4}'| sed -e 's/,/ /g')
-				do
-					if [ "$OPT" == "ro" ]
-					then
-						is_rw="0"
-                        logHandler "CRIT: ${TOUCHFILE} is not mounted as writable."
-                        ERR_MESG+="Could not write in ${mp} filesystem was mounted RO."
-					fi
-				done
-			fi
-			if [ "${is_rw}" -eq 1 ]
-			then
-				TOUCHFILE="${mp}/.mount_test_from_$(hostname)_$(date +%Y-%m-%d--%H-%M-%S).$RANDOM.$$"
-				timeout --signal=TERM --kill-after=1 "${TIME_TILL_STALE}" touch "${TOUCHFILE}" &>/dev/null
-				rc="${?}"
-
-        		if [ "${rc}" == "124" ]
-        		then
-					logHandler "CRIT: ${TOUCHFILE} is not writable."
-					ERR_MESG+="Could not write in ${mp} in $TIME_TILL_STALE sec. Seems to be stale."
-				else
-					if [ ! -f "${TOUCHFILE}" ]
-					then
-						logHandler "CRIT: ${TOUCHFILE} is not writable."
-						ERR_MESG+="Could not write in ${mp}."
-					else
-						rm "${TOUCHFILE}" &>/dev/null
-					fi
-				fi
-            fi
-        fi
-
-		addPerfdata "${mp}"
-
-        # Check for FS type using stat
-        efstype="${fstypes[$mpidx]}"
-        mpidx="$(( mpidx + 1 ))"
-
-        if [ -z "${efstype}" ]
-        then
-            continue
-        fi
-
-        if ! rfstype="$(${STAT} -f --printf='%T' "${mp}")"
-        then
-            logHandler "CRIT: Fail to fetch FS type for ${mp}"
-            ERR_MESG+=("Fail to fetch FS type for ${mp}")
-            continue
-        fi
-
-        if [ "${rfstype}" != "${efstype}" ]
-        then
-            logHandler "CRIT: Bad FS type for ${mp}"
-            ERR_MESG+=("Bad FS type for ${mp}. Got '${rfstype}' while '${efstype}' was expected")
-            continue
-        fi
-done
-
-if [ ${#ERR_MESG[*]} -ne 0 ]
-then
-    echo -n "CRITICAL: "
-    for element in "${ERR_MESG[@]}"
-    do
-        echo -n "${element} ; "
-    done
-    echo
-    exit "${STATE_CRITICAL}"
-else
-	MPS="$(trim ${MPS[*]})"
-	MPS="${MPS// /, }"
-
-	if [ "$crit_cnt" -gt 0 ]
-	then
-		echo "CRIT: All mounts (${MPS[*]}) were found, but critical threshold exceeded."
-		state="$STATE_CRITICAL"
-	elif [ "$warn_cnt" -gt 0 ]
-	then
-		echo "WARN: All mounts (${MPS[*]}) were found, but warning threshold exceeded."
-		state="$STATE_WARNING"
-	else
-		if [ -n "$WARN" ] && [ -n "$CRIT" ]
+	## check kernel mounts
+    if [ -z "$( awk '$'${MF}' == "'${mp}'" {print $'${MF}'}' "${MTAB}" )" ]
+    then
+		## if a softlink is not an adequate replacement
+		if [ -z "$LINKOK" ] || [ ! -L "${mp}" ]
 		then
-			echo "OK: All mounts (${MPS[*]}) were found, no thresholds exceeded."
-			state="$STATE_OK"
-		else
-			echo "OK: All mounts (${MPS[*]}) were found, no thresholds defined."
-			state="$STATE_OK"
+            logHandler "CRIT: ${mp} is not mounted"
+            ERR_MESG+=("${mp} is not mounted")
+        fi
+    fi
+
+    ## check if it stales
+    timeout --signal=TERM --kill-after=1 "${TIME_TILL_STALE}" df -k "${DFARGS}" "${mp}" &>/dev/null
+    rc="${?}"
+
+    if [ "${rc}" == "124" ]
+    then
+        ERR_MESG+=("${mp} did not respond in $TIME_TILL_STALE sec. Seems to be stale.")
+    else
+		## if it not stales, check if it is a directory
+		is_rw="0"
+        if [ ! -d "${mp}" ]
+        then
+            logHandler "CRIT: ${mp} doesn't exist on filesystem"
+            ERR_MESG+=("${mp} doesn't exist on filesystem")
+            ## if wanted, check if it is writable
+		elif [ ${WRITETEST} -eq 1 ]
+		then
+            is_rw="1"
+			## in auto mode first check if it's readonly
+		elif [ "${WRITETEST}" -eq 1 ] && [ "${AUTO}" -eq 1 ]
+		then
+			is_rw="1"
+			for OPT in $(${GREP} -w ${mp} ${FSTAB} | awk '{print $4}'| sed -e 's/,/ /g')
+			do
+				if [ "$OPT" == "ro" ]
+				then
+					is_rw="0"
+                    logHandler "CRIT: ${TOUCHFILE} is not mounted as writable."
+                    ERR_MESG+=("Could not write in ${mp} filesystem was mounted RO.")
+				fi
+			done
 		fi
-	fi
+		if [ "${is_rw}" -eq 1 ]
+		then
+			TOUCHFILE="${mp}/.mount_test_from_$(hostname)_$(date +%Y-%m-%d--%H-%M-%S).$RANDOM.$$"
+			timeout --signal=TERM --kill-after=1 "${TIME_TILL_STALE}" touch "${TOUCHFILE}" &>/dev/null
+			rc="${?}"
 
-	for item in "${outvar[@]}"
-	do
-		echo "${item}"
-	done
+    		if [ "${rc}" == "124" ]
+    		then
+				logHandler "CRIT: ${TOUCHFILE} is not writable."
+				ERR_MESG+=("Could not write in ${mp} in $TIME_TILL_STALE sec. Seems to be stale.")
+			else
+				if [ ! -f "${TOUCHFILE}" ]
+				then
+					logHandler "CRIT: ${TOUCHFILE} is not writable."
+					ERR_MESG+=("Could not write in ${mp}.")
+				else
+					rm "${TOUCHFILE}" &>/dev/null
+				fi
+			fi
+        fi
+    fi
 
-	echo "| ${perfdata[*]}"
-	exit "${state}"
-fi
+	addPerfdata "${mp}"
+
+    # Check for FS type using stat
+    efstype="${fstypes[$mpidx]}"
+    mpidx="$(( mpidx + 1 ))"
+
+    if [ -z "${efstype}" ]
+    then
+        continue
+    fi
+
+    if ! rfstype="$(${STAT} -f --printf='%T' "${mp}")"
+    then
+        logHandler "CRIT: Fail to fetch FS type for ${mp}"
+        ERR_MESG+=("Fail to fetch FS type for ${mp}")
+        continue
+    fi
+
+    if [ "${rfstype}" != "${efstype}" ]
+    then
+        logHandler "CRIT: Bad FS type for ${mp}"
+        ERR_MESG+=("Bad FS type for ${mp}. Got '${rfstype}' while '${efstype}' was expected")
+        continue
+    fi
+done
