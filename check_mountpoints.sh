@@ -310,7 +310,7 @@ trim()
 
 is_integer()
 {
-    if [ "$1" -ge 0 -o "$1" -lt 0 2>/dev/null ]
+    if printf '%d' "${1}" &> /dev/null
     then
         return 0
     else
