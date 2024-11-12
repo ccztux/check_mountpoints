@@ -1,0 +1,4 @@
+/unversioned/*
+*.swp
+change_version.sh
+TODO*
