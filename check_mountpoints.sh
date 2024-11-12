@@ -290,7 +290,7 @@ signalHandler()
 			logHandler "Caught EXIT, preparing for exiting..."
 			cleanUp
 
-			if [ ${#ERR_MESG[*]} -ne 0 ]
+			if [ ${#ERR_MESG[*]} != 0 ]
 			then
 			    echo -n "CRITICAL: "
 			    for element in "${ERR_MESG[@]}"
@@ -330,7 +330,7 @@ signalHandler()
 					echo "${item}"
 				done
 
-				if [ "${#perfdata[@]}" -ne "0" ]
+				if [ "${#perfdata[@]}" != "0" ]
 				then
 					echo "| ${perfdata[*]}"
                 fi
@@ -446,13 +446,13 @@ cleanUp()
 	local rc=
 
 	# Remove temporary files
-	if [ -f "${TOUCHFILE}" ]
+	if [ -f "${touchfile}" ]
 	then
-		if rm "${TOUCHFILE}" &>/dev/null
+		if rm "${touchfile}" &>/dev/null
 		then
-			logHandler "Deleting file: '${TOUCHFILE}' was successful."
+			logHandler "Deleting file: '${touchfile}' was successful."
 		else
-			logHandler "Deleting file: '${TOUCHFILE}' was not successful."
+			logHandler "Deleting file: '${touchfile}' was not successful."
 		fi
 	fi
 
@@ -493,7 +493,7 @@ setConfig
 # startup checks
 # --------------------------------------------------------------------
 
-if [ $# -eq 0 ]
+if [ "${#}" == "0" ]
 then
     printUsage
     exit "${STATE_CRITICAL}"
@@ -503,20 +503,20 @@ while [ "$1" != "" ]
 do
     case "$1" in
 		-a)
-			AUTO=1
+			AUTO="1"
 			shift
 			;;
         -A)
-			AUTO=1
-			AUTOIGNORE=1
+			AUTO="1"
+			AUTOIGNORE="1"
 			shift
 			;;
 		-E)
-			EXCLUDE=$2
+			EXCLUDE="${2}"
 			shift 2
 			;;
         -o)
-			NOAUTOIGNORE=1
+			NOAUTOIGNORE="1"
 			shift
 			;;
         --help)
@@ -528,59 +528,59 @@ do
 			exit "${STATE_OK}"
 			;;
         -m)
-			MTAB=$2
+			MTAB="${2}"
 			shift 2
 			;;
         -f)
-			FSTAB=$2
+			FSTAB="${2}"
 			shift 2
 			;;
         -N)
-			FSF=$2
+			FSF="${2}"
 			shift 2
 			;;
         -M)
-			MF=$2
+			MF="${2}"
 			shift 2
 			;;
         -O)
-			OF=$2
+			OF="${2}"
 			shift 2
 			;;
         -T)
-			TIME_TILL_STALE=$2
+			TIME_TILL_STALE="${2}"
 			shift 2
 			;;
         -i)
-			IGNOREFSTAB=1
+			IGNOREFSTAB="1"
 			shift
 			;;
         -w)
-			WRITETEST=1
+			WRITETEST="1"
 			shift
 			;;
         -W)
-			WARN=$2
+			WARN="${2}"
 			shift 2
 			;;
         -C)
-			CRIT=$2
+			CRIT="${2}"
 			shift 2
 			;;
         -L)
-			LINKOK=1
+			LINKOK="1"
 			shift
 			;;
         -e)
-			DFARGS=$2
+			DFARGS="${2}"
 			shift 2
 			;;
         -t)
-			FSTYPE=$2
+			FSTYPE="${2}"
 			shift 2
 			;;
         /*)
-			MPS="${MPS} $1"
+			MPS+="${1} "
 			shift
 			;;
         *)
@@ -640,9 +640,9 @@ then
 	FSTAB="${TMPTAB}"
 fi
 
-if [ "${AUTO}" -eq 1 ]
+if [ "${AUTO}" == "1" ]
 then
-    if [ "${NOAUTOIGNORE}" -eq 1 ]
+    if [ "${NOAUTOIGNORE}" == "1" ]
     then
         NOAUTOCOND='!index($'${OF}',"'${NOAUTOSTR}'")'
     fi
@@ -655,7 +655,7 @@ then
 	fi
 fi
 
-if [ -z "${MPS}"  ] && [ "${AUTOIGNORE}" -eq 1 ]
+if [ -z "${MPS}"  ] && [ "${AUTOIGNORE}" == "1" ]
 then
 	echo "OK: no external mounts were found in ${FSTAB}"
 	exit "${STATE_OK}"
@@ -705,7 +705,7 @@ for mp in ${MPS}
 do
     ## If its an OpenVZ Container or -a Mode is selected skip fstab check.
     ## -a Mode takes mounts from fstab, we do not have to check if they exist in fstab ;)
-    if [ ! -f /proc/vz/veinfo ] && [ "${AUTO}" -ne 1 ] && [ "${IGNOREFSTAB}" -ne 1 ]
+    if [ ! -f /proc/vz/veinfo ] && [ "${AUTO}" != 1 ] && [ "${IGNOREFSTAB}" != 1 ]
     then
         if [ -z "$( "${GREP}" -v '^#' "${FSTAB}" | awk '$'${MF}' == "'${mp}'" {print $'${MF}'}' )" ]
         then
@@ -740,40 +740,40 @@ do
             logHandler "CRITICAL: ${mp} doesn't exist on filesystem"
             ERR_MESG+=("${mp} doesn't exist on filesystem")
             ## if wanted, check if it is writable
-		elif [ ${WRITETEST} -eq 1 ]
+		elif [ "${WRITETEST}" == "1" ]
 		then
             is_rw="1"
 			## in auto mode first check if it's readonly
-		elif [ "${WRITETEST}" -eq 1 ] && [ "${AUTO}" -eq 1 ]
+		elif [ "${WRITETEST}" == "1" ] && [ "${AUTO}" == "1" ]
 		then
 			is_rw="1"
-			for OPT in $(${GREP} -w ${mp} ${FSTAB} | awk '{print $4}'| sed -e 's/,/ /g')
+			for opt in $(${GREP} -w "${mp}" "${FSTAB}" | awk '{print $4}'| sed -e 's/,/ /g')
 			do
-				if [ "$OPT" == "ro" ]
+				if [ "$opt" == "ro" ]
 				then
 					is_rw="0"
-                    logHandler "CRITICAL: ${TOUCHFILE} is not mounted as writable."
+                    logHandler "CRITICAL: ${touchfile} is not mounted as writable."
                     ERR_MESG+=("Could not write in ${mp} filesystem was mounted RO.")
 				fi
 			done
 		fi
-		if [ "${is_rw}" -eq 1 ]
+		if [ "${is_rw}" == "1" ]
 		then
-			TOUCHFILE="${mp}/.mount_test_from_$(hostname)_$(date +%Y-%m-%d--%H-%M-%S).$RANDOM.$$"
-			timeout --signal=TERM --kill-after=1 "${TIME_TILL_STALE}" touch "${TOUCHFILE}" &>/dev/null
+			touchfile="${mp}/.mount_test_from_$(hostname)_$(date +%Y-%m-%d--%H-%M-%S).$RANDOM.$$"
+			timeout --signal=TERM --kill-after=1 "${TIME_TILL_STALE}" touch "${touchfile}" &>/dev/null
 			rc="${?}"
 
     		if [ "${rc}" == "124" ]
     		then
-				logHandler "CRITICAL: ${TOUCHFILE} is not writable."
+				logHandler "CRITICAL: ${touchfile} is not writable."
 				ERR_MESG+=("Could not write in ${mp} in $TIME_TILL_STALE sec. Seems to be stale.")
 			else
-				if [ ! -f "${TOUCHFILE}" ]
+				if [ ! -f "${touchfile}" ]
 				then
-					logHandler "CRITICAL: ${TOUCHFILE} is not writable."
+					logHandler "CRITICAL: ${touchfile} is not writable."
 					ERR_MESG+=("Could not write in ${mp}.")
 				else
-					rm "${TOUCHFILE}" &>/dev/null
+					rm "${touchfile}" &>/dev/null
 				fi
 			fi
         fi
