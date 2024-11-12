@@ -61,7 +61,7 @@
 #  - fix bad bug in MTAB check
 # changes 1.14
 #  - better support for HP-UX, Icinga
-#  - cleanup writecheck file after check
+#  - cleanUp writecheck file after check
 # changes 1.13
 #  - add support for glusterfs
 # changes 1.12
@@ -75,7 +75,7 @@
 #  - new flag -i disable check of fstab (if you use automount etc.)
 # changes 1.8
 #  - fiexes for solaris support
-#  - improved usage text
+#  - improved printUsage text
 # changes 1.7
 #  - new flag -A to autoread mounts from fstab and return OK if no mounts found in fstab
 # changes 1.6
@@ -104,13 +104,13 @@
 # --------------------------------------------------------------------
 # signal traps
 # --------------------------------------------------------------------
-trap 'sig_handler SIGTERM' SIGTERM
-trap 'sig_handler SIGINT' SIGINT
-trap 'sig_handler SIGHUP' SIGHUP
-trap 'sig_handler SIGABRT' SIGABRT
-trap 'sig_handler SIGQUIT' SIGQUIT
-trap 'sig_handler ERR "${LINENO}" "${BASH_COMMAND}"' ERR
-trap 'sig_handler EXIT' EXIT
+trap 'signalHandler SIGTERM' SIGTERM
+trap 'signalHandler SIGINT' SIGINT
+trap 'signalHandler SIGHUP' SIGHUP
+trap 'signalHandler SIGABRT' SIGABRT
+trap 'signalHandler SIGQUIT' SIGQUIT
+trap 'signalHandler ERR "${LINENO}" "${BASH_COMMAND}"' ERR
+trap 'signalHandler EXIT' EXIT
 
 
 # --------------------------------------------------------------------
@@ -206,7 +206,7 @@ log()
     $LOGGER ${PROGNAME} "$@"
 }
 
-usage()
+printUsage()
 {
 	echo "${PROGNAME} v${PROGVERSION}"
 	echo ""
@@ -235,10 +235,10 @@ usage()
     echo " MOUNTPOINTS list of mountpoints to check. Ignored when -a is given"
 }
 
-print_help()
+printHelp()
 {
     echo ""
-    usage
+    printUsage
     echo ""
     echo "Check if nfs/cifs/davfs/zfs/btrfs mountpoints are correctly implemented and mounted."
     echo ""
@@ -251,7 +251,7 @@ print_help()
 
 # Create a temporary mtab systems that don't have such a file
 # Format is dev mountpoint filesystem
-make_mtab()
+makeMtab()
 {
 	mtab="$(mktemp)"
 	mount > "${mtab}"
@@ -261,35 +261,35 @@ make_mtab()
 	echo "${mtab}"
 }
 
-check_options()
+checkOptions()
 {
 	if [ -z "$WARN" ] && [ -n "$CRIT" ]
 	then
 		echo "You have defined only a critical threshold, you must define warning and critical threshold!"
 		echo
-		usage
+		printUsage
 		exit "${EXIT_UNKNOWN}"
 	elif [ -n "$WARN" ] && [ -z "$CRIT" ]
 	then
 		echo "You have defined only a warning threshold, you must define warning and critical threshold!"
 		echo
-		usage
+		printUsage
 		exit "${EXIT_UNKNOWN}"
 	elif [ -n "$WARN" ] && [ -n "$CRIT" ]
 	then
-		if ! is_integer "$WARN"
+		if ! isInteger "$WARN"
 		then
 			echo "The warning threshold: '$WARN' is not an integer!"
 			echo
-			usage
+			printUsage
 			exit "${EXIT_UNKNOWN}"
 		fi
 
-		if ! is_integer "$CRIT"
+		if ! isInteger "$CRIT"
 		then
 			echo "The critical threshold: '$CRIT' is not an integer!"
 			echo
-			usage
+			printUsage
 			exit "${EXIT_UNKNOWN}"
 		fi
 
@@ -297,7 +297,7 @@ check_options()
 		then
 			echo "The warning threshold: '$WARN' is greater than the critical threshold: '$CRIT'."
 			echo
-			usage
+			printUsage
 			exit "${EXIT_UNKNOWN}"
 		fi
 	fi
@@ -311,7 +311,7 @@ trim()
     echo -n "$string"
 }
 
-is_integer()
+isInteger()
 {
     if printf '%d' "${1}" &> /dev/null
     then
@@ -321,13 +321,13 @@ is_integer()
     fi
 }
 
-add_perfdata()
+addPerfdata()
 {
 	local MP="${1}"
 	local warnstrip=
 	local critstrip=
 	local mpusage=
-	mpusage="$(df -h -P ${MP} | tail -n1 | awk '{print $4":"$5}')"
+	mpusage="$(timeout --signal=TERM --kill-after=1 "${TIME_TILL_STALE}" df -h -P ${MP} | tail -n1 | awk '{print $4":"$5}')"
 	local mpavail="${mpusage%%:*}"
 	local mpused="${mpusage##*:}"
 	local mpusedstrip="${mpused/\%/}"
@@ -355,7 +355,7 @@ add_perfdata()
 	fi
 }
 
-sig_handler()
+signalHandler()
 {
 	local signal="$1"
 	local bash_lineno="$2"
@@ -395,7 +395,7 @@ sig_handler()
             ;;
 		EXIT)
 			log "Caught EXIT, preparing for exiting..."
-			cleanup
+			cleanUp
 			exit
 			;;
 		*)
@@ -404,7 +404,7 @@ sig_handler()
 	esac
 }
 
-cleanup()
+cleanUp()
 {
 	local rc=
 
@@ -453,7 +453,7 @@ cleanup()
 
 if [ $# -eq 0 ]
 then
-    usage
+    printUsage
     exit "${STATE_CRITICAL}"
 fi
 
@@ -478,11 +478,11 @@ do
 			shift
 			;;
         --help)
-			print_help
+			printHelp
 			exit "${STATE_OK}"
 			;;
         -h)
-			print_help
+			printHelp
 			exit "${STATE_OK}"
 			;;
         -m)
@@ -542,14 +542,14 @@ do
 			shift
 			;;
         *)
-			usage
+			printUsage
 			exit "${STATE_UNKNOWN}"
 			;;
     esac
 done
 
 # check options
-check_options
+checkOptions
 
 # set some global vars
 perfdata=()
@@ -625,7 +625,7 @@ elif [ -z "${MPS}"  ]
 then
     log "ERROR: no mountpoints given!"
     echo "ERROR: no mountpoints given!"
-    usage
+    printUsage
     exit "${STATE_UNKNOWN}"
 fi
 
@@ -638,7 +638,7 @@ fi
 
 if [ "${MTAB}" == "none" ]
 then
-	MTAB="$(make_mtab)"
+	MTAB="$(makeMtab)"
 fi
 
 if [ ! -e "${MTAB}" ]
@@ -741,7 +741,7 @@ do
             fi
         fi
 
-		add_perfdata "${MP}"
+		addPerfdata "${MP}"
 
         # Check for FS type using stat
         efstype="${fstypes[$mpidx]}"
