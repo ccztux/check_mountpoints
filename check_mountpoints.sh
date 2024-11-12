@@ -134,58 +134,58 @@ export PATH="/bin:/usr/local/bin:/sbin:/usr/bin:/usr/sbin:/usr/sfw/bin"
 LIBEXEC="/opt/nagios/libexec /usr/lib64/nagios/plugins /usr/lib/nagios/plugins /usr/lib/monitoring-plugins /usr/local/nagios/libexec /usr/local/icinga/libexec /usr/local/libexec /opt/csw/libexec/nagios-plugins /opt/plugins /usr/local/libexec/nagios/ /usr/local/ncpa/plugins"
 for i in ${LIBEXEC}
 do
-  	[ -r ${i}/utils.sh ] && source ${i}/utils.sh
+	[ -r ${i}/utils.sh ] && source ${i}/utils.sh
 done
 
 if [ -z "$STATE_OK" ]
 then
-  	echo "nagios utils.sh not found" &>/dev/stderr
-  	exit 1
+	echo "nagios utils.sh not found" &>/dev/stderr
+	exit 1
 fi
 
 KERNEL="$(uname -s)"
 case "$KERNEL" in
-  	# For solaris FSF=4 MF=3 FSTAB=/etc/vfstab MTAB=/etc/mnttab gnu grep and bash required
-  	SunOS)
-		FSF=4
-		MF=3
-		OF=6
-    	NOAUTOSTR=no
-    	FSTAB=/etc/vfstab
-    	MTAB=/etc/mnttab
-    	GREP=ggrep
-    	STAT=stat
+	# For solaris FSF=4 MF=3 FSTAB=/etc/vfstab MTAB=/etc/mnttab gnu grep and bash required
+	SunOS)
+		FSF="4"
+		MF="3"
+		OF="6"
+		NOAUTOSTR="no"
+		FSTAB="/etc/vfstab"
+		MTAB="/etc/mnttab"
+		GREP="ggrep"
+		STAT="stat"
 		;;
 	HP-UX)
-		FSF=3
-	    MF=2
-	    OF=4
-	    NOAUTOSTR=noauto
-	    FSTAB=/etc/fstab
-	    MTAB=/dev/mnttab
-	    GREP=grep
-	    STAT=stat
-	    ;;
+		FSF="3"
+		MF="2"
+		OF="4"
+		NOAUTOSTR="noauto"
+		FSTAB="/etc/fstab"
+		MTAB="/dev/mnttab"
+		GREP="grep"
+		STAT="stat"
+		;;
 	FreeBSD)
-		FSF=3
-	    MF=2
-	    OF=4
-	    NOAUTOSTR=noauto
-	    FSTAB=/etc/fstab
-	    MTAB=none
-	    GREP=grep
-	    STAT=stat
+		FSF="3"
+		MF="2"
+		OF="4"
+		NOAUTOSTR="noauto"
+		FSTAB="/etc/fstab"
+		MTAB="none"
+		GREP="grep"
+		STAT="stat"
 		;;
 	*)
-		FSF=3
-	    MF=2
-	    OF=4
-	    NOAUTOSTR=noauto
-	    FSTAB=/etc/fstab
-	    MTAB=/proc/mounts
-	    GREP=grep
-	    STAT=stat
-	    ;;
+		FSF="3"
+		MF="2"
+		OF="4"
+		NOAUTOSTR="noauto"
+		FSTAB="/etc/fstab"
+		MTAB="/proc/mounts"
+		GREP="grep"
+		STAT="stat"
+		;;
 esac
 
 # Time in seconds after which the check assumes that an NFS mount is staled, if
@@ -466,90 +466,90 @@ while [ "$1" != "" ]
 do
     case "$1" in
 		-a)
-        	AUTO=1
-        	shift
-        	;;
+			AUTO=1
+			shift
+			;;
         -A)
-        	AUTO=1
-        	AUTOIGNORE=1
-        	shift
-        	;;
+			AUTO=1
+			AUTOIGNORE=1
+			shift
+			;;
 		-E)
 			EXCLUDE=$2
 			shift 2
 			;;
         -o)
-        	NOAUTOIGNORE=1
-        	shift
-        	;;
+			NOAUTOIGNORE=1
+			shift
+			;;
         --help)
-        	print_help
-        	exit $STATE_OK
-        	;;
+			print_help
+			exit $STATE_OK
+			;;
         -h)
-        	print_help
-        	exit $STATE_OK
-        	;;
+			print_help
+			exit $STATE_OK
+			;;
         -m)
-        	MTAB=$2
-        	shift 2
-        	;;
+			MTAB=$2
+			shift 2
+			;;
         -f)
-        	FSTAB=$2
-        	shift 2
-        	;;
+			FSTAB=$2
+			shift 2
+			;;
         -N)
-        	FSF=$2
-        	shift 2
-        	;;
+			FSF=$2
+			shift 2
+			;;
         -M)
-        	MF=$2
-        	shift 2
-        	;;
+			MF=$2
+			shift 2
+			;;
         -O)
-        	OF=$2
-        	shift 2
-        	;;
+			OF=$2
+			shift 2
+			;;
         -T)
-        	TIME_TILL_STALE=$2
-        	shift 2
-        	;;
+			TIME_TILL_STALE=$2
+			shift 2
+			;;
         -i)
-        	IGNOREFSTAB=1
-        	shift
-        	;;
+			IGNOREFSTAB=1
+			shift
+			;;
         -w)
-        	WRITETEST=1
-        	shift
-        	;;
+			WRITETEST=1
+			shift
+			;;
         -W)
-        	WARN=$2
-        	shift 2
-        	;;
+			WARN=$2
+			shift 2
+			;;
         -C)
-        	CRIT=$2
-        	shift 2
-        	;;
+			CRIT=$2
+			shift 2
+			;;
         -L)
-        	LINKOK=1
-        	shift
-        	;;
+			LINKOK=1
+			shift
+			;;
         -e)
-        	DFARGS=$2
-        	shift 2
-        	;;
+			DFARGS=$2
+			shift 2
+			;;
         -t)
-        	FSTYPE=$2
-        	shift 2
-        	;;
+			FSTYPE=$2
+			shift 2
+			;;
         /*)
-        	MPS="${MPS} $1"
-        	shift
-        	;;
+			MPS="${MPS} $1"
+			shift
+			;;
         *)
-        	usage
-        	exit $STATE_UNKNOWN
-        	;;
+			usage
+			exit $STATE_UNKNOWN
+			;;
     esac
 done
 
@@ -678,9 +678,9 @@ do
         ## check kernel mounts
         if [ -z "$( awk '$'${MF}' == "'${MP}'" {print $'${MF}'}' "${MTAB}" )" ]
         then
-        	## if a softlink is not an adequate replacement
-        	if [ -z "$LINKOK" ] || [ ! -L ${MP} ]
-        	then
+			## if a softlink is not an adequate replacement
+			if [ -z "$LINKOK" ] || [ ! -L ${MP} ]
+			then
                 log "CRIT: ${MP} is not mounted"
                 ERR_MESG[${#ERR_MESG[*]}]="${MP} is not mounted"
             fi
@@ -704,8 +704,8 @@ do
             $(kill -s SIGTERM $DFPID &>/dev/null)
             ERR_MESG[${#ERR_MESG[*]}]="${MP} did not respond in $TIME_TILL_STALE sec. Seems to be stale."
         else
-        	## if it not stales, check if it is a directory
-	        ISRW=0
+			## if it not stales, check if it is a directory
+			ISRW=0
             if [ ! -d ${MP} ]
             then
                 log "CRIT: ${MP} doesn't exist on filesystem"
@@ -818,9 +818,9 @@ do
 		fi
 
 		for item in "${outvar[@]}"
-	   	do
+		do
 			echo "${item}"
-	   	done
+		done
 
 		echo "| ${perfdata[*]}"
 		exit $STATE
