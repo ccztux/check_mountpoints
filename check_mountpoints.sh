@@ -710,6 +710,8 @@ fi
 mpidx="0"
 for mp in ${mps}
 do
+	is_stale="0"
+
     ## If its an OpenVZ Container or -a Mode is selected skip fstab check.
     ## -a Mode takes mounts from fstab, we do not have to check if they exist in fstab ;)
     if [ ! -f /proc/vz/veinfo ] && [ "${auto}" != 1 ] && [ "${ignorefstab}" != 1 ]
@@ -738,6 +740,7 @@ do
 
     if [ "${rc}" == "124" ]
     then
+    	is_stale="1"
         err_mesg+=("${mp} did not respond in ${time_till_stale} sec. Seems to be stale.")
     else
 		## if it not stales, check if it is a directory
@@ -772,6 +775,7 @@ do
 
     		if [ "${rc}" == "124" ]
     		then
+				is_stale="1"
 				logHandler "CRITICAL: ${touchfile} is not writable."
 				err_mesg+=("Could not write in ${mp} in ${time_till_stale} sec. Seems to be stale.")
 			else
@@ -786,7 +790,11 @@ do
         fi
     fi
 
-	addPerfdata "${mp}"
+	# Add perfdata only if mp is not stale
+	if [ "${is_stale}" != "1" ]
+	then
+		addPerfdata "${mp}"
+	fi
 
     # Check for FS type using stat
     efstype="${fstypes[${mpidx}]}"
