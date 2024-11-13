@@ -247,34 +247,30 @@ isInteger()
 addPerfdata()
 {
 	local mp="${1}"
-	local warnstrip=
-	local critstrip=
 	local mpusage=
 	mpusage="$(timeout --signal=TERM --kill-after=1 "${time_till_stale}" df -h -P "${mp}" | tail -n1 | awk '{print $4":"$5}')"
 	local mpavail="${mpusage%%:*}"
 	local mpused="${mpusage##*:}"
-	local mpusedstrip="${mpused/\%/}"
+	mpused="${mpused/\%/}"
 
 	if [ -n "${warn}" ] && [ -n "${crit}" ]
 	then
-		warnstrip="${warn/\%/}"
-		critstrip="${crit/\%/}"
-		perfdata+=("'${mp}_space_avail'=${mpavail};;;; '${mp}_used_percent'=${mpused};${warn};${crit};;")
+		perfdata+=("'${mp}_space_avail'=${mpavail};;;; '${mp}_used_percent'=${mpused}%;${warn};${crit};;")
 
-		if [ "${mpusedstrip}" -gt "${critstrip}" ]
+		if [ "${mpused}" -gt "${crit}" ]
 		then
 			crit_cnt="$(( crit_cnt + 1 ))"
-			outvar+=("CRITICAL: Mountpoint: '${mp}' used percent is higher than critical threshold (space_avail=${mpavail}, used_percent=${mpused})")
-		elif [ "${mpusedstrip}" -gt "${warnstrip}" ]
+			outvar+=("CRITICAL: Mountpoint: '${mp}' used percent is higher than critical threshold (space_avail=${mpavail}, used_percent=${mpused}%)")
+		elif [ "${mpused}" -gt "${warn}" ]
 		then
 			warn_cnt="$(( warn_cnt + 1 ))"
-			outvar+=("WARNING: Mountpoint: '${mp}' used percent is higher than warning threshold (space_avail=${mpavail}, used_percent=${mpused})")
+			outvar+=("WARNING: Mountpoint: '${mp}' used percent is higher than warning threshold (space_avail=${mpavail}, used_percent=${mpused}%)")
 		else
-			outvar+=("OK: Mountpoint: '${mp}' used percent is less than warning threshold (space_avail=${mpavail}, used_percent=${mpused})")
+			outvar+=("OK: Mountpoint: '${mp}' used percent is less than warning threshold (space_avail=${mpavail}, used_percent=${mpused}%)")
 		fi
 	else
-		perfdata+=("'${mp}_space_avail'=${mpavail};;;; '${mp}_used_percent'=${mpused};;;;")
-		outvar+=("OK: Mountpoint: '${mp}' (space_avail=${mpavail}, used_percent=${mpused})")
+		perfdata+=("'${mp}_space_avail'=${mpavail};;;; '${mp}_used_percent'=${mpused}%;;;;")
+		outvar+=("OK: Mountpoint: '${mp}' (space_avail=${mpavail}, used_percent=${mpused}%)")
 	fi
 }
 
@@ -567,11 +563,11 @@ do
 			shift
 			;;
         -W)
-			warn="${2}"
+			warn="${2/\%/}"
 			shift 2
 			;;
         -C)
-			crit="${2}"
+			crit="${2/\%/}"
 			shift 2
 			;;
         -L)
