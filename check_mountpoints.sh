@@ -252,11 +252,11 @@ addPerfdata()
 		critstrip="${crit/\%/}"
 		perfdata+=("'${mp}_space_avail'=${mpavail};;;; '${mp}_used_percent'=${mpused};${warn};${crit};;")
 
-		if [ "${mpusedstrip}" -gt "${crit}strip" ]
+		if [ "${mpusedstrip}" -gt "${critstrip}" ]
 		then
 			crit_cnt="$(( crit_cnt + 1 ))"
-			outvar+=("CRITICAL: Mountpoint: '${mp}' used percent is higher than critical threshold (space_avail=${mpavail}, used_percent=${{mpused})")
-		elif [ "${mpusedstrip}" -gt "${warn}strip" ]
+			outvar+=("CRITICAL: Mountpoint: '${mp}' used percent is higher than critical threshold (space_avail=${mpavail}, used_percent=${mpused})")
+		elif [ "${mpusedstrip}" -gt "${warnstrip}" ]
 		then
 			warn_cnt="$(( warn_cnt + 1 ))"
 			outvar+=("WARNING: Mountpoint: '${mp}' used percent is higher than warning threshold (space_avail=${mpavail}, used_percent=${mpused})")
