@@ -306,11 +306,11 @@ signalHandler()
 				mps="$(trim ${mps[*]})"
 				mps="${mps// /, }"
 
-				if [ "${crit}_cnt" -gt 0 ]
+				if [ "${crit_cnt}" -gt 0 ]
 				then
 					echo "CRITICAL: All mounts (${mps[*]}) were found, but critical threshold exceeded."
 					state="$STATE_CRITICAL"
-				elif [ "${warn}_cnt" -gt 0 ]
+				elif [ "${warn_cnt}" -gt 0 ]
 				then
 					echo "WARNING: All mounts (${mps[*]}) were found, but warning threshold exceeded."
 					state="$STATE_WARNING"
