@@ -603,18 +603,22 @@ if [ -x "/sbin/zfs" ]
 then
 	tmptab="$(mktemp)"
 	cat "${fstab}" > "${tmptab}"
+
 	for ds in $(zfs list -H -o name -t filesystem)
 	do
 		mp="$(zfs get -H mountpoint "${ds}" | awk '{print $3}')"
+
 		# mountpoint ~ "none|legacy|-"
 		if [ ! -d "${mp}" ]
 		then
 			continue
 		fi
+
 		if [ "$(zfs get -H canmount "${ds}" | awk '{print $3}')" == "off" ]
 		then
 			continue
 		fi
+
 		case "${kernel}" in
 			SunOS)
 				if [ "$(zfs get -H zoned "${ds}" | awk '{print $3}')" == "on" ]
