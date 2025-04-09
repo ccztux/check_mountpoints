@@ -277,6 +277,7 @@ addPerfdata()
 signalHandler()
 {
 	local signal="$1"
+    local counter="0"
 
 	case "${signal}" in
 		SIGTERM)
@@ -298,11 +299,19 @@ signalHandler()
 			if [ ${#err_mesg[*]} != 0 ]
 			then
 			    echo -n "CRITICAL: "
-			    for element in "${err_mesg[@]}"
+
+			    for element in "${!err_mesg[@]}"
 			    do
-			        echo -n "${element} , "
+                    if [ "${counter}" -lt "${element}" ]
+                    then
+			            echo -n "${err_mesg[${element}]} , "
+                    else
+			            echo "${err_mesg[${element}]}"
+                    fi
+
+                    counter="$(( counter + 1 ))"
 			    done
-			    echo
+
 			    exit "${STATE_CRITICAL}"
             fi
 
