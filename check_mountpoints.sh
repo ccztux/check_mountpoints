@@ -720,7 +720,7 @@ mpidx="0"
 for mp in ${mps}
 do
 	is_stale="0"
-    doenst_exist="0"
+    doesnt_exist="0"
 
     ## If its an OpenVZ Container or -a Mode is selected skip fstab check.
     ## -a Mode takes mounts from fstab, we do not have to check if they exist in fstab ;)
@@ -728,7 +728,7 @@ do
     then
         if [ -z "$( "${grep_bin}" -v '^#' "${fstab}" | awk '$'${mf}' == "'${mp}'" {print $'${mf}'}' )" ]
         then
-            doenst_exist="1"
+            doesnt_exist="1"
             logHandler "CRITICAL: ${mp} doesn't exist in /etc/fstab"
             err_mesg+=("${mp} doesn't exist in fstab ${fstab}")
         fi
@@ -758,7 +758,7 @@ do
 		is_rw="0"
         if [ ! -d "${mp}" ]
         then
-            doenst_exist="1"
+            doesnt_exist="1"
             logHandler "CRITICAL: ${mp} doesn't exist on filesystem"
             err_mesg+=("${mp} doesn't exist on filesystem")
             ## if wanted, check if it is writable
@@ -803,7 +803,7 @@ do
     fi
 
 	# Add perfdata only if mp is not stale and exists
-	if [ "${is_stale}" != "1" ] && [ "${doenst_exist}" != "1" ]
+	if [ "${is_stale}" != "1" ] && [ "${doesnt_exist}" != "1" ]
 	then
 		addPerfdata "${mp}"
 	fi
